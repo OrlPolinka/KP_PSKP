@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email             String          @unique @db.VarChar(255)
+  password          String          @db.VarChar(255)
+  role              String          @db.VarChar(20)
+  fullName          String          @map("fullname") @db.VarChar(255)
+  phone             String?         @db.VarChar(20)
+  isActive          Boolean?        @default(true) @map("isactive")
+  createdAt         DateTime?       @default(now()) @map("createdat") @db.Timestamp(6)
+  attendanceRecords AttendanceLog[] @relation("AttendanceLogToTrainer")
+  bookingsCancelled Booking[]       @relation("BookingCancelledBy")
+  bookingsAsClient  Booking[]       @relation("BookingToClient")
+  memberships       Membership[]    @relation("MembershipToClient")
+  schedulesCreated  Schedule[]      @relation("ScheduleCreatedBy")
+  trainerInfo       Trainer[]
+
+  @@map("users")
+}
+
+model Trainer {
+  id                 String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String?    @map("userid") @db.Uuid
+  specialization     String?
+  bio                String?
+  photoUrl           String?    @map("photourl") @db.VarChar(500)
+  hireDate           DateTime?  @map("hiredate") @db.Date
+  schedulesAsTrainer Schedule[] @relation("ScheduleToTrainer")
+  user               User?      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("trainers")
+}
+
+model DanceStyle {
+  id          Int        @id @default(autoincrement())
+  name        String     @unique @db.VarChar(100)
+  description String?
+  isActive    Boolean?   @default(true) @map("isactive")
+  schedules   Schedule[]
+
+  @@map("dancestyles")
+}
+
+model Hall {
+  id          Int        @id @default(autoincrement())
+  name        String     @db.VarChar(100)
+  capacity    Int
+  description String?
+  isActive    Boolean?   @default(true) @map("isactive")
+  schedules   Schedule[]
+
+  @@map("halls")
+}
+
+model MembershipType {
+  id           Int          @id @default(autoincrement())
+  name         String       @db.VarChar(100)
+  description  String?
+  price        Decimal      @db.Decimal(10, 2)
+  visitCount   Int?         @map("visitcount")
+  durationDays Int?         @map("durationdays")
+  isActive     Boolean?     @default(true) @map("isactive")
+  memberships  Membership[]
+
+  @@map("membershiptypes")
+}
+
+model Membership {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId         String         @map("clientid") @db.Uuid
+  membershipTypeId Int            @map("membershiptypeid")
+  purchaseDate     DateTime?      @default(now()) @map("purchasedate") @db.Timestamp(6)
+  startDate        DateTime       @map("startdate") @db.Date
+  endDate          DateTime?      @map("enddate") @db.Date
+  remainingVisits  Int?           @map("remainingvisits")
+  status           String?        @default("active") @db.VarChar(20)
+  pricePaid        Decimal        @map("pricepaid") @db.Decimal(10, 2)
+  pausedAt         DateTime?      @map("pausedat") @db.Date
+  pausedUntil      DateTime?      @map("pauseduntill") @db.Date
+  bookings         Booking[]
+  client           User           @relation("MembershipToClient", fields: [clientId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  membershipType   MembershipType @relation(fields: [membershipTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("memberships")
+}
+
+model Schedule {
+  id                 String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  danceStyleId       Int        @map("dancestyleid")
+  trainerId          String     @map("trainerid") @db.Uuid
+  hallId             Int        @map("hallid")
+  date               DateTime   @db.Date
+  startTime          DateTime   @map("starttime") @db.Time(6)
+  endTime            DateTime   @map("endtime") @db.Time(6)
+  maxCapacity        Int        @map("maxcapacity")
+  currentBookings    Int?       @default(0) @map("currentbookings")
+  status             String?    @default("scheduled") @db.VarChar(20)
+  cancellationReason String?    @map("cancellationreason")
+  createdBy          String     @map("createdby") @db.Uuid
+  createdAt          DateTime?  @default(now()) @map("createdat") @db.Timestamp(6)
+  bookings           Booking[]
+  createdByUser      User       @relation("ScheduleCreatedBy", fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  danceStyle         DanceStyle @relation(fields: [danceStyleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  hall               Hall       @relation(fields: [hallId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  trainer            Trainer    @relation("ScheduleToTrainer", fields: [trainerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("schedule")
+}
+
+model Booking {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scheduleId      String           @map("scheduleid") @db.Uuid
+  clientId        String           @map("clientid") @db.Uuid
+  membershipId    String           @map("membershipid") @db.Uuid
+  bookingTime     DateTime?        @default(now()) @map("bookingtime") @db.Timestamp(6)
+  status          String?          @default("booked") @db.VarChar(20)
+  cancelledAt     DateTime?        @map("cancelledat") @db.Timestamp(6)
+  cancelledBy     String?          @map("cancelledby") @db.Uuid
+  attendanceLogs  AttendanceLog[]
+  history         BookingHistory[]
+  cancelledByUser User?            @relation("BookingCancelledBy", fields: [cancelledBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  client          User             @relation("BookingToClient", fields: [clientId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  membership      Membership       @relation(fields: [membershipId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  schedule        Schedule         @relation(fields: [scheduleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("bookings")
+}
+
+model AttendanceLog {
+  id        BigInt    @id @default(autoincrement())
+  bookingId String    @map("bookingid") @db.Uuid
+  trainerId String    @map("trainerid") @db.Uuid
+  markedAt  DateTime? @default(now()) @map("markedat") @db.Timestamp(6)
+  booking   Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  trainer   User      @relation("AttendanceLogToTrainer", fields: [trainerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("attendancelog")
+}
+
+model BookingHistory {
+  id        BigInt  @id @default(autoincrement())
+  bookingId String  @map("bookingid") @db.Uuid
+  status    String? @default("attended") @map("status") @db.VarChar(20)
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("bookinghistory")
+}
