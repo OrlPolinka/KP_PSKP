@@ -33,7 +33,6 @@ const routes = [
     {method: 'get',                path: '/memberships/:id',                       action: 'getMembershipById'},
     {method: 'post',               path: '/memberships',                           action: 'createMembership'},
     {method: 'put',                path: '/memberships/:id/pause',                 action: 'pauseMembership'},
-    {method: 'put',                path: '/memberships/:id/activate',              action: 'activateMembership'},
     {method: 'put',                path: '/memberships/:id',                       action: 'updateMembership'},
 
     //типы абонементов
