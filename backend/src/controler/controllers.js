@@ -4,6 +4,8 @@ const bcrypt = require('bcriptjs');
 const { stat } = require('fs');
 const jwt = require('jsonwebtoken');
 const { start } = require('repl');
+const { isatty } = require('tty');
+const { availableMemory } = require('process');
 
 class Controler{
 
@@ -100,7 +102,7 @@ class Controler{
 
             if(!user.isActive){
                 return res.status(403).json({
-                    error: 'Аккаунт заблокированю Обратитесь к администратору'
+                    error: 'Аккаунт заблокирован. Обратитесь к администратору'
                 });
             }
 
@@ -628,8 +630,8 @@ class Controler{
 
     async updateSchedule(req, res) {
         try {
-            const { id } = req.params;
-            const {
+            let { id } = req.params;
+            let {
                 danceStyleId,
                 trainerId,
                 hallId,
@@ -642,7 +644,7 @@ class Controler{
                 cancellationReason
             } = req.body;
             
-            const existingSchedule = await prisma.schedule.findUnique({
+            let existingSchedule = await prisma.schedule.findUnique({
                 where: { id }
             });
             
@@ -667,7 +669,7 @@ class Controler{
             }
             
             if (danceStyleId && danceStyleId !== existingSchedule.danceStyleId) {
-                const danceStyle = await prisma.danceStyle.findUnique({
+                let danceStyle = await prisma.danceStyle.findUnique({
                     where: { id: danceStyleId }
                 });
                 if (!danceStyle) {
@@ -675,18 +677,18 @@ class Controler{
                 }
             }
             
-            const newDate = date ? new Date(date) : existingSchedule.date;
-            const newStartTime = startTime 
+            let newDate = date ? new Date(date) : existingSchedule.date;
+            let newStartTime = startTime 
                 ? new Date(`1970-01-01T${startTime}`) 
                 : existingSchedule.startTime;
-            const newEndTime = endTime 
+            let newEndTime = endTime 
                 ? new Date(`1970-01-01T${endTime}`) 
                 : existingSchedule.endTime;
-            const newHallId = hallId || existingSchedule.hallId;
-            const newTrainerId = trainerId || existingSchedule.trainerId;
+            let newHallId = hallId || existingSchedule.hallId;
+            let newTrainerId = trainerId || existingSchedule.trainerId;
             
             if (trainerId && trainerId !== existingSchedule.trainerId) {
-                const trainer = await prisma.user.findFirst({
+                let trainer = await prisma.user.findFirst({
                     where: {
                         id: trainerId,
                         role: 'trainer',
@@ -698,13 +700,13 @@ class Controler{
                 }
             }
             
-            const needCheckHall = (hallId && hallId !== existingSchedule.hallId) ||
+            let needCheckHall = (hallId && hallId !== existingSchedule.hallId) ||
                 (date && date !== existingSchedule.date.toISOString().split('T')[0]) ||
                 (startTime && startTime !== existingSchedule.startTime.toISOString().split('T')[1].slice(0, 8)) ||
                 (endTime && endTime !== existingSchedule.endTime.toISOString().split('T')[1].slice(0, 8));
             
             if (needCheckHall) {
-                const hallSchedule = await prisma.schedule.findFirst({
+                let hallSchedule = await prisma.schedule.findFirst({
                     where: {
                         id: { not: id },
                         hallId: newHallId,
@@ -737,13 +739,13 @@ class Controler{
                 }
             }
             
-            const needCheckTrainer = (trainerId && trainerId !== existingSchedule.trainerId) ||
+            let needCheckTrainer = (trainerId && trainerId !== existingSchedule.trainerId) ||
                 (date && date !== existingSchedule.date.toISOString().split('T')[0]) ||
                 (startTime && startTime !== existingSchedule.startTime.toISOString().split('T')[1].slice(0, 8)) ||
                 (endTime && endTime !== existingSchedule.endTime.toISOString().split('T')[1].slice(0, 8));
             
             if (needCheckTrainer) {
-                const trainerSchedule = await prisma.schedule.findFirst({
+                let trainerSchedule = await prisma.schedule.findFirst({
                     where: {
                         id: { not: id },
                         trainerId: newTrainerId,
@@ -782,8 +784,8 @@ class Controler{
                 });
             }
             
-            const newMaxCapacity = maxCapacity !== undefined ? maxCapacity : existingSchedule.maxCapacity;
-            const newCurrentBookings = currentBookings !== undefined ? currentBookings : existingSchedule.currentBookings;
+            let newMaxCapacity = maxCapacity !== undefined ? maxCapacity : existingSchedule.maxCapacity;
+            let newCurrentBookings = currentBookings !== undefined ? currentBookings : existingSchedule.currentBookings;
             
             if (newCurrentBookings > newMaxCapacity) {
                 return res.status(400).json({
@@ -791,7 +793,7 @@ class Controler{
                 });
             }
             
-            const scheduleUpdateData = {};
+            let scheduleUpdateData = {};
             if (danceStyleId !== undefined) scheduleUpdateData.danceStyleId = danceStyleId;
             if (trainerId !== undefined) scheduleUpdateData.trainerId = trainerId;
             if (hallId !== undefined) scheduleUpdateData.hallId = hallId;
@@ -803,7 +805,7 @@ class Controler{
             if (status !== undefined) scheduleUpdateData.status = status;
             if (cancellationReason !== undefined) scheduleUpdateData.cancellationReason = cancellationReason;
             
-            const updatedSchedule = await prisma.schedule.update({
+            let updatedSchedule = await prisma.schedule.update({
                 where: { id },
                 data: scheduleUpdateData,
                 include: {
@@ -1415,44 +1417,876 @@ class Controler{
         }
     }
 
-    updateMembership(req, res){
+    async updateMembership(req, res){
+        try{
+            let { id } = req.params;
+            let {
+                clientId,
+                membershipTypeId,
+                purchaseDate,
+                startDate,
+                endDate,
+                remainingVisits,
+                status,
+                pricePaid
+            } = req.body;
 
+            let existingMembership = await prisma.membership.findUnique({
+                where: {id},
+                include: {
+                    membershipType: true,
+                    client: true
+                }
+            });
+
+            if(!existingMembership){
+                return res.status(404).json({
+                    error: 'Абонемент не найден'
+                });
+            }
+
+            if(clientId && clientId !== existingMembership.clientId){
+                let newClient = await prisma.user.findFirst({
+                    where: {
+                        id: clientId,
+                        role: 'client',
+                        isActive: true
+                    }
+                });
+
+                if(!newClient){
+                    return res.status(404).json({
+                        error: 'Клиент не найден или неактивен'
+                    });
+                }
+            }
+
+            if(membershipTypeId && membershipTypeId !== existingMembership.membershipTypeId){
+                let newType = await prisma.membershipType.findFirst({
+                    where: {
+                        id: membershipTypeId
+                    }
+                });
+
+                if(!newType){
+                    return res.status(404).json({
+                        error: 'Тип абонемента не найден'
+                    });
+                }
+            }            
+
+            if(status){
+                let validStatuses = ['active', 'paused', 'expired', 'cancelled'];
+                if(!validStatuses.includes(status)){
+                    return res.status(400).json({
+                        error: `Недопустимый статус. Допустимые значения: ${validStatuses.join(', ')}`
+                    });
+                }
+            }
+
+            if(remainingVisits !== undefined && remainingVisits < 0){
+                return res.status(400).json({
+                    error: 'Количество оставшихся занятий не может быть отрицательным'
+                });
+            }
+
+            if(pricePaid !== undefined && pricePaid < 0){
+                return res.status(400).json({
+                    error: 'Цена не может быть отрицательной'
+                });
+            }            
+
+            let updateData = {};
+            if(clientId !== undefined) updateData.clientId = clientId;
+            if(membershipTypeId !== undefined) updateData.membershipTypeId = membershipTypeId;
+            if (purchaseDate !== undefined) updateData.purchaseDate = new Date(purchaseDate);
+            if (startDate !== undefined) updateData.startDate = new Date(startDate);
+            if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
+            if(remainingVisits !== undefined) updateData.remainingVisits = remainingVisits;
+            if(status !== undefined) updateData.status = status;
+            if(pricePaid !== undefined) updateData.pricePaid = pricePaid;
+
+            let updatedMembership = await prisma.membership.update({
+                where: {id},
+                data: updateData,
+                include: {
+                    membershipType: true,
+                    client: {
+                        select: {
+                            if: true,
+                            fullName: true,
+                            email: true,
+                            phone: true
+                        }
+                    }
+                }
+            });
+
+            res.json({
+                success: true,
+                message: 'Абонемент обновлен',
+                membership: updatedMembership
+            });
+        }
+        catch(error){
+            console.error('updateMembership error:', error);
+            req.status(500).json({error: 'Ошибка при обновлении абонемента'});
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //типы абонементов
-    getMembershipTypes(req, res){
+    async getMembershipTypes(req, res){
+        try{
+            let membershipTypes = await prisma.membershipType.findMany({
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    price: true,
+                    visitCount: true,
+                    durationDays: true,
+                    isUnlimited: true,
+                    isActive: true,
+                    sortOrder: true
+                },
+                where: {isActive: true},
+                orderBy: [
+                    {sortOrder: 'asc'},
+                    {price: 'asc'}
+                ]
+            });
 
+            res.json({
+                success: true,
+                membershipTypes
+            });
+        }
+        catch(error){
+            console.error('getMembershipTypes error:', error);
+            req.status(500).json({error: 'Ошибка при получении типов абонементов'});
+        }
     }
 
-    createMembershipType(req, res){
+    async createMembershipType(req, res){
+        try{
+            let {
+                name,
+                description,
+                price,
+                visitCount,
+                durationDays,
+                isUnlimited,
+                isActive,
+                sortOrder
+            } = req.body;
 
+            if(!name || price === undefined){
+                return res.status(400).json({
+                    error: 'Название и цена обязательны'
+                });
+            }
+
+            if(price !== undefined && price < 0){
+                return res.status(400).json({
+                    error: 'Цена не может быть отрицательной'
+                });
+            }
+
+            if(visitCount !== undefined && visitCount < 0){
+                return res.status(400).json({
+                    error: 'Количество занятий не может быть отрицательным'
+                });
+            }
+
+            if(durationDays !== undefined && durationDays < 0){
+                return res.status(400).json({
+                    error: 'Срок действия не может быть отрицательным'
+                });
+            }
+
+            if(isUnlimited){
+                if(visitCount !== undefined && visitCount !== null){
+                    return res.status(400).json({
+                        error: 'Для безлимитного абонемента количество занятий не указывается'
+                    });
+                }
+            } else {
+                if(!visitCount || visitCount <= 0){
+                    return res.status(400).json({
+                        error: 'Для обычного абонемента необходимо указать количество занятий (больше 0)'
+                    });
+                }
+            }
+
+            if(sortOrder !== undefined && sortOrder < 0){
+                return res.status(400).json({
+                    error: 'Порядок сортировки не может быть отрицательным'
+                });
+            }
+
+            let existingMembershipType = await prisma.membershipType.findFirst({
+                where: {name}
+            });
+
+            if(existingMembershipType){
+                return res.status(400).json({
+                    error: 'Тип абонемента с таким названием уже существует'
+                });
+            }
+
+            let membershipType = await prisma.membershipType.create({
+                data: {
+                    name,
+                    description: description || null,
+                    price,
+                    visitCount: isUnlimited ? null : (visitCount || null),
+                    durationDays: durationDays || null,
+                    isUnlimited: isUnlimited || false,
+                    isActive: isActive !== undefined ? isActive : true,
+                    sortOrder: sortOrder || 0
+                }
+            });
+
+            res.status(201).json({
+                success: true,
+                message: 'Тип абонемента успешно создан',
+                membershipType
+            })
+        }
+        catch(error){
+            console.error('createMembershipType error:', error);
+            req.status(500).json({error: 'Ошибка при создании типа абонемента'});
+        }
     }
 
-    updateMembershipType(req, res){
+    async updateMembershipType(req, res){
+        try{
+            let { id } = req.params;
+            let {
+                name,
+                description,
+                price,
+                visitCount,
+                durationDays,
+                isUnlimited,
+                isActive,
+                sortOrder
+            } = req.body;
 
+            let existingType = await prisma.membershipType.findUnique({
+                where: {id}
+            });
+
+            if(!existingType){
+                return res.status(404).json({
+                    error: 'Тип абонемента не найден'
+                });
+            }
+
+            if(price !== undefined && price < 0){
+                return res.status(400).json({
+                    error: 'Цена не может быть отрицательной'
+                });
+            }
+
+            if(visitCount !== undefined && visitCount < 0){
+                return res.status(400).json({
+                    error: 'Количество занятий не может быть отрицательным'
+                });
+            }
+
+            if(durationDays !== undefined && durationDays < 0){
+                return res.status(400).json({
+                    error: 'Срок действия не может быть отрицательным'
+                });
+            }
+
+            let newIsUnlimited = isUnlimited !== undefined ? isUnlimited : existingType.isUnlimited;
+
+            if(newIsUnlimited){
+                if(visitCount !== undefined && visitCount !== null){
+                    return res.status(400).json({
+                        error: 'Для безлимитного абонемента количество занятий не указывается'
+                    });
+                }
+            } else {
+                let newVisitCount = visitCount !== undefined ? visitCount : existingType.visitCount;
+                if(!newVisitCount || newVisitCount <= 0){
+                    return res.status(400).json({
+                        error: 'Для обычного абонемента необходимо указать количество занятий (больше 0)'
+                    });
+                }
+            }
+
+            if(sortOrder !== undefined && sortOrder < 0){
+                return res.status(400).json({
+                    error: 'Порядок сортировки не может быть отрицательным'
+                });
+            }
+
+            if(name && name !== existingType.name){
+                let existingByName = await prisma.membershipType.findFirst({
+                    where: {name}
+                });
+
+                if(existingByName){
+                    return res.status(400).json({
+                        error: 'Тип абонемента с таким названием уже существует'
+                    });
+                }
+            }
+
+            let membershipTypeUpdateData = {};
+            if(name !== undefined) membershipTypeUpdateData.name = name;
+            if(description !== undefined) membershipTypeUpdateData.description = description;
+            if(price !== undefined) membershipTypeUpdateData.price = price;
+            if(visitCount !== undefined) membershipTypeUpdateData.visitCount = newIsUnlimited ? null : visitCount;
+            if(durationDays !== undefined) membershipTypeUpdateData.durationDays = durationDays;
+            if(isUnlimited !== undefined) membershipTypeUpdateData.isUnlimited = isUnlimited;
+            if(isActive !== undefined) membershipTypeUpdateData.isActive = isActive;
+            if(sortOrder !== undefined) membershipTypeUpdateData.sortOrder = sortOrder;
+
+            let updateMembershipType = await prisma.membershipType.update({
+                where: {id},
+                data: membershipTypeUpdateData
+            });
+
+            res.json({
+                success: true,
+                message: 'Тип абонемента обновлен',
+                membershipType: updateMembershipType
+            });
+        }
+        catch(error){
+            console.error('updateMembershipType error:', error);
+            req.status(500).json({error: 'Ошибка при изменении типа абонемента'});
+        }
     }
 
-    deleteMembershipType(req, res){
+    async deleteMembershipType(req, res){
+        try{
+            let {id} = req.params;
 
+            let existingType = await prisma.membershipType.findUnique({
+                where: {id},
+                include: {
+                    memberships: {
+                        where: {
+                            status: {in ['active', 'paused']}
+                        }
+                    }
+                }
+            });
+
+            if(!existingType){
+                return res.status(404).json({error: 'Тип абонемента не найден'});
+            }
+
+            if(existingType.memberships && existingType.memberships.length > 0){
+                return res.status(409).json({
+                    error: `Невозможно удалить тип абонемента, так как есть ${existingType.memberships.length} активных абонементов этого типа. Сначала отмените или удалите эти абонементы`
+                });
+            }
+
+            let deletedMembershipType = await prisma.membershipType.delete({
+                where: {id}
+            });
+
+            res.json({
+                success: true,
+                message: 'Тип абонемента успешно удален',
+                membershipType: deletedMembershipType
+            });
+        }
+        catch(error){
+            console.error('deleteMembershipType error:', error);
+            req.status(500).json({error: 'Ошибка при удалении типа абонемента'});
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //запись на занятия
-    getBookings(req, res){
+    async getBookings(req, res){
+        try{
+            let {role, id: userId} = req.user;
+            let {
+                scheduleId,
+                clienId,
+                status,
+                date,
+                fromDate,
+                toDate
+            } = req.query;
 
+            let where = {};
+
+            if(role === 'client'){
+                where.clienId = userId;
+            } else if(role === 'trainer'){
+                where.schedule = {
+                    trainerId: userId
+                };
+            }
+
+            if(scheduleId){
+                where.scheduleId = scheduleId;
+            }
+
+            if(clienId && (role === 'admin' || role === 'trainer')){
+                where.clienId = clienId;
+            }
+
+            if(status){
+                let validStatuses = ['booked', 'attended', 'no_show', 'cancelled'];
+                if(validStatuses.includes(status)){
+                    where.status = status;
+                }
+            }
+
+            if(date){
+                where.schedule = {
+                    ...where.schedule,
+                    date: new Date(date)
+                };
+            }
+
+            if(fromDate || toDate){
+                where.schedule = {
+                    ...where.schedule,
+                    date: {}
+                };
+                if(fromDate) where.schedule.date.gte = new Date(fromDate);
+                if(toDate) where.schedule.date.lte = new Date(toDate);
+            }
+
+            let bookings = await prisma.booking.findMany({
+                where,
+                include: {
+                    schedule: {
+                        include: {
+                            danceStyle: true,
+                            hall: true,
+                            trainer: {
+                                select: {
+                                    id: true,
+                                    fullName: true,
+                                    email: true,
+                                    phone: true
+                                }
+                            }
+                        }
+                    },
+                    client: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            email: true,
+                            phone: true
+                        }
+                    },
+                    membership: {
+                        include: {
+                            membershipType: true
+                        }
+                    },
+                    attendanceLogs: true
+                },
+                orderBy: [
+                    {bookingTime: 'desc'}
+                ]
+            });
+
+            let formattedBookings = bookings.map(booking => ({
+                id: booking.id,
+                schedule: {
+                    id: booking.schedule.id,
+                    date: booking.schedule.date,
+                    startTime: booking.schedule.startTime,
+                    endTime: booking.schedule.endTime,
+                    danceStyle: booking.schedule.danceStyle,
+                    trainer: booking.schedule.trainer,
+                    hall: booking.schedule.hall
+                },
+                client: booking.client,
+                membership: {
+                    id: booking.membership.id,
+                    type: booking.membership.type,
+                    remainingVisits: booking.membership.remainingVisits
+                },
+                status: booking.status,
+                bookingTime: booking.bookingTime,
+                attendedAt: booking.attendedAt,
+                cancelledAt: booking.cancelledAt,
+                isAttended: !!booking.attendanceLog
+            }));
+
+            res.json({
+                success: true,
+                count: bookings.length,
+                bookings: formattedBookings
+            });
+        }
+        catch(error){
+            console.error('getBookings error:', error);
+            req.status(500).json({error: 'Ошибка при получении записей на занятие'});
+        }
     }
 
-    getBookingsBySchedule(req, res){
+    async getBookingsBySchedule(req, res){
+        try{
+            let {scheduleId} = req.params;
+            let { role, id: userId } = req.user;
+            
+            let schedule = await prisma.schedule.findUnique({
+                where: {id: scheduleId},
+                include: {
+                    danceStyle: true,
+                    hall: true,
+                    trainer: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            email: true,
+                            phone: true
+                        }
+                    }
+                }
+            });
 
+            if(!schedule){
+                return res.status(404).json({
+                    error: 'Занятие не найдено'
+                });
+            }
+
+            if(role === 'client'){
+                return res.status(403).json({
+                    error: 'Доступ запрещен. Просматривать записи на занятие могут только тренеры и администраторы'
+                });
+            }
+
+            if(role === 'trainer' && schedule.trainerId !== userId){
+                return res.status(403).json({
+                    error: 'Вы можете просматривать записи только на свои занятия'
+                });
+            }
+
+            let bookings = await prisma.booking.findMany({
+                where: {
+                    scheduleId,
+                    status: { not: 'cancelled' }
+                },
+                include: {
+                    client: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            phone: true,
+                            email: true
+                        }
+                    },
+                    membership: {
+                        include: {
+                            membershipType: {
+                                select: {
+                                    name: true,
+                                    visitCount: true,
+                                    isUnlimited: true
+                                }
+                            }
+                        }
+                    },
+                    attendanceLog: {
+                        select: {
+                            id: true,
+                            markedAt: true,
+                            notes: true
+                        }
+                    }
+                },
+                orderBy: { bookingTime: 'asc' }
+            });
+
+            let stats = {
+                total: bookings.length,
+                booked: bookings.filter(b => b.status === 'booked').length,
+                attended: bookings.filter(b => b.status === 'attended').length,
+                noShow: bookings.filter(b => b.status === 'no_show').length
+            };
+
+            let formattedBookings = bookings.map(booking => ({
+                id: booking.id,
+                client: booking.client,
+                status: booking.status,
+                bookingTime: booking.bookingTime,
+                attendedAt: booking.attendedAt,
+                membership: {
+                    id: booking.membership.id,
+                    typeName: booking.membership.membershipType.name,
+                    remainingVisits: booking.membership.remainingVisits,
+                    isUnlimited: booking.membership.membershipType.isUnlimited
+                },
+                attendanceLog: booking.attendanceLog ? {
+                    markedAt: booking.attendanceLog.markedAt,
+                    notes: booking.attendanceLog.notes
+                } : null
+            }));
+
+            res.json({
+                success: true,
+                schedule: {
+                    id: schedule.id,
+                    date: schedule.date,
+                    startTime: schedule.startTime,
+                    endTime: schedule.endTime,
+                    danceStyle: schedule.danceStyle,
+                    hall: schedule.hall,
+                    trainer: schedule.trainer,
+                    maxCapacity: schedule.maxCapacity,
+                    currentBookings: schedule.currentBookings,
+                    status: schedule.status
+                },
+                stats,
+                availableSpots: schedule.maxCapacity - stats.total,
+                bookings: formattedBookings
+            });
+        }
+        catch(error){
+            console.error('getBookingsBySchedule error:', error);
+            req.status(500).json({error: 'Ошибка при получении записей на занятие'});
+        }
     }
 
-    createBooking(req, res){
+    async createBooking(req, res){
+        try{
+            let {role, id: userId} = req.user;
+            let {scheduleId, membershipId} = req.body;
 
+            if(role !== 'client'){
+                return res.status(403).json({
+                    error: 'Записываться на занятия могут только клиенты'
+                });
+            }
+
+            if(!scheduleId){
+                return res.status(400).json({
+                    error: 'Необходимо указать ID занятия'
+                });
+            }
+
+            let schedule = await prisma.schedule.findUnique({
+                where: {id: scheduleId},
+                include: {
+                    danceStyle: true,
+                    hall: true,
+                    trainer: {
+                        select: {
+                            id: true,
+                            fullName: true
+                        }
+                    }
+                }
+            });
+
+            if(!schedule){
+                return res.status(404).json({
+                    error: 'Занятие не найдено'
+                });
+            }
+
+            if(schedule.status === 'cancelled'){
+                return res.status(400).json({
+                    error: 'Это занятие отменено, запись невозможна'
+                });
+            }
+
+            let now = new Date();
+            let scheduleDateTime = new Date(schedule.date);
+            let [startHour, startMinute] = schedule.startTime.toISOString().split('T')[1].split(':');
+            scheduleDateTime.setHours(parseInt(startHour), parseInt(startMinute));
+
+            if(scheduleDateTime < now){
+                return res.status(400).json({
+                    error: 'Нельзя записаться на прошедшее занятие'
+                });
+            }
+
+            if(schedule.currentBookings >= schedule.maxCapacity){
+                return res.status(409).json({
+                    error: 'Нет свободных мест на это занятие'
+                });
+            }
+
+            let existingBookings = await prisma.booking.findFirst({
+                where: {
+                    scheduleId,
+                    clientId: userId,
+                    status: {not: 'cancelled'}
+                }
+            });
+
+            if(existingBookings){
+                return res.status(409).json({
+                    error: 'Вы уже записаны на это занятие'
+                });
+            }
+
+            let selectedMembershipId = membershipId;
+            let membership = null;
+
+            if(!selectedMembershipId){
+                membership = await prisma.membership.findFirst({
+                    where: {
+                        clientId: userId,
+                        status: 'active',
+                        OR: [
+                            {remainingVisits: {gt: 0}},
+                            {remainingVisits: null}
+                        ],
+                        AND: [
+                            {startDate: {lte: new Date()}},
+                            {OR: [
+                                {endDate: {gte: new Date()}},
+                                {endDate: null}
+                            ]}
+                        ]
+                    },
+                    include: {
+                        membershipType: true
+                    },
+                    orderBy: [
+                        {remainingVisits: 'asc'},   //сначала те, у кого меньше занятий
+                        {endDate: 'asc'}            //потом те, что заканчиваются раньше
+                    ]
+                });
+
+                if(!membership){
+                    return res.status(400).json({
+                        error: 'У вас нет активного абонемента с остатком занятий. Приобретите абонемент'
+                    });
+                }
+
+                selectedMembershipId = membership.id;
+            } else{
+                membership = await prisma.membership.findFirst({
+                    where: {
+                        id: selectedMembershipId,
+                        clientId: userId,
+                        status: 'active',
+                        OR: [
+                            { remainingVisits: { gt: 0 } },
+                            { remainingVisits: null }
+                        ],
+                        AND: [
+                            { startDate: { lte: new Date() } },
+                            { OR: [
+                                { endDate: { gte: new Date() } },
+                                { endDate: null }
+                            ]}
+                        ]
+                    },
+                    include: {
+                        membershipType: true
+                    }
+                });
+
+                if(!membership){
+                    return res.status(400).json({
+                        error: 'Выбранный абонемент неактивен или не имеет остатка занятий'
+                    });
+                }
+            }
+
+            let booking = await prisma.booking.create({
+                data: {
+                    scheduleId,
+                    clientId: userId,
+                    membershipId: selectedMembershipId,
+                    status: 'booked',
+                    bookingTime: new Date()
+                },
+                include: {
+                    schedule: {
+                        include: {
+                            danceStyle: true,
+                            hall: true,
+                            trainer: {
+                                select: {
+                                    id: true,
+                                    fullName: true
+                                }
+                            }
+                        }
+                    },
+                    membership: {
+                        include: {
+                            membershipType: true
+                        }
+                    }
+                }
+            });
+
+            await prisma.schedule.update({
+                where: {id: scheduleId},
+                data: {
+                    currentBookings: schedule.currentBookings + 1
+                }
+            });
+
+            if(!membership.membershipType.isUnlimited && membership.remainingVisits !== null){
+                await prisma.membership.update({
+                    where: {id: selectedMembershipId},
+                    data: {remainingVisits: membership.remainingVisits - 1}
+                });
+            }
+            
+            res.status(201).json({
+                success: true,
+                message: 'Вы успешно записаны на занятие',
+                booking: {
+                    id: booking.id,
+                    schedule: {
+                        id: booking.schedule.id,
+                        date: booking.schedule.date,
+                        startTime: booking.schedule.startTime,
+                        endTime: booking.schedule.endTime,
+                        danceStyle: booking.schedule.danceStyle.name,
+                        trainer: booking.schedule.trainer.fullName,
+                        hall: booking.schedule.hall.name
+                    },
+                    status: booking.status,
+                    bookingTime: booking.bookingTime,
+                    membership: {
+                        id: booking.membership.id,
+                        typeName: booking.membership.membershipType.name,
+                        remainingVisits: membership.membershipType.isUnlimited 
+                            ? 'Безлимит' 
+                            : (membership.remainingVisits - 1)
+                    }
+                }
+            });
+        }
+        catch(error){
+            console.error('createBooking error:', error);
+            req.status(500).json({error: 'Ошибка при записи на занятие'});
+        }
     }
 
-    cancelBooking(req, res){
+    async cancelBooking(req, res){
+        try{
+            let {id} = req.params;
+            let {role, id: userId} = req.user;
+            let {reason} = req.body;
 
+            let booking = await prisma.booking.findUnique({
+                
+            })
+        }
+        catch(error){
+            console.error('cancelBooking error:', error);
+            req.status(500).json({error: 'Ошибка при отмене занятия'});
+        }
     }
 
     markAttendance(req, res){
