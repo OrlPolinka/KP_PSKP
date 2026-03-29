@@ -1,12 +1,13 @@
 const express = require('express');
 const Controller = require('../controler/controllers');
+const {authMiddleware, roleMiddleware} = require('../middleware/auth');
 const router = express.Router();
 let controler = new Controller();
 
 const routes = [
     //авторизация/регистрация
-    {method: 'post',               path: '/auth/register',                         action: 'register'},
-    {method: 'post',               path: '/auth/login',                            action: 'login'},
+    {method: 'post',               path: '/auth/register',                         action: 'register',            public: true},
+    {method: 'post',               path: '/auth/login',                            action: 'login',               public: true},
     {method: 'get',                path: '/auth/me',                               action: 'getMe'},
 
     //пользователи(админ)
@@ -71,9 +72,16 @@ const routes = [
 ];
 
 routes.forEach(route => {
-    router[route.method](`/api${route.path}`, (req, res) => {
-        controler[route.action](req, res);
-    });
+    let handlers = [];
+    if(!route.public){
+        handlers.push(authMiddleware);
+    }
+    if(route.roles && route.roles.length > 0){
+        handlers.push(roleMiddleware(...route.roles));
+    }
+    handlers.push((req, res) => controler[route.action](req, res));
+
+    router[route.method](`/api${route.path}`, ...handlers);
 });
 
 module.exports = router;

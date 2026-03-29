@@ -167,7 +167,7 @@ class Controler{
         }   
         catch(error){
             console.error('GetMe error:', error);
-            req.status(500).json({error: 'Ошибка при получении профиля'});
+            res.status(500).json({error: 'Ошибка при получении профиля'});
         }
     }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -191,7 +191,7 @@ class Controler{
         }
         catch(error){
             console.error('getUsers error:', error);
-            req.status(500).json({error: 'Ошибка при получении пользователей'});
+            res.status(500).json({error: 'Ошибка при получении пользователей'});
         }
     }
 
@@ -219,7 +219,7 @@ class Controler{
         }
         catch(error){
             console.error('getUserById error:', error);
-            req.status(500).json({error: 'Ошибка при получении пользователя'});
+            res.status(500).json({error: 'Ошибка при получении пользователя'});
         }
     }
 
@@ -243,7 +243,7 @@ class Controler{
         }
         catch(error){
             console.error('blockUser error:', error);
-            req.status(500).json({error: 'Ошибка при изменении статуса пользователя'});
+            res.status(500).json({error: 'Ошибка при изменении статуса пользователя'});
         }
     }
 
@@ -273,7 +273,7 @@ class Controler{
         }
         catch(error){
             console.error('deleteUser error:', error);
-            req.status(500).json({error: 'Ошибка при удалении пользователя'});
+            res.status(500).json({error: 'Ошибка при удалении пользователя'});
         }
     }
 
@@ -300,7 +300,7 @@ class Controler{
         }
         catch(error){
             console.error('getTrainers error:', error);
-            req.status(500).json({error: 'Ошибка при получении тренеров'});
+            res.status(500).json({error: 'Ошибка при получении тренеров'});
         }
     }
 
@@ -436,7 +436,7 @@ class Controler{
         }
         catch(error){
             console.error('updateTrainer error:', error);
-            req.status(500).json({error: 'Ошибка при изменении тренера'});
+            res.status(500).json({error: 'Ошибка при изменении тренера'});
         }
     }
 
@@ -473,7 +473,7 @@ class Controler{
         }
         catch(error){
             console.error('deleteTrainer error:', error);
-            req.status(500).json({error: 'Ошибка при удалении тренера'});
+            res.status(500).json({error: 'Ошибка при удалении тренера'});
         }
     }
 
@@ -482,6 +482,12 @@ class Controler{
     async createSchedule(req, res){
         try{
             let {danceStyleId, trainerId, hallId, date, startTime, endTime, maxCapacity, currentBookings, status, cancellationReason} = req.body;
+
+            if(!req.user || !req.user.id){
+                return res.status(401).json({
+                    error: 'Не авторизован. Передайте Bearer токен в Authorization header'
+                });
+            }
 
             let createdBy = req.user.id;
 
@@ -593,8 +599,8 @@ class Controler{
                     trainerId,
                     hallId,
                     date: new Date(date),
-                    startTime:  new Date(`1970-01-01${startTime}`),
-                    endTime:  new Date(`1970-01-01${endTime}`),
+                    startTime:  new Date(`1970-01-01T${startTime}`),
+                    endTime:  new Date(`1970-01-01T${endTime}`),
                     maxCapacity,
                     currentBookings: 0,
                     status: status || 'scheduled',
@@ -869,7 +875,7 @@ class Controler{
         }
         catch(error){
             console.error('deleteSchedule error:', error);
-            req.status(500).json({error: 'Ошибка при удалении занятия в расписании'});
+            res.status(500).json({error: 'Ошибка при удалении занятия в расписании'});
         }
     }
 
@@ -954,7 +960,7 @@ class Controler{
         }
         catch(error){
             console.error('getSchedule error:', error);
-            req.status(500).json({error: 'Ошибка при получении расписания'});
+            res.status(500).json({error: 'Ошибка при получении расписания'});
         }
     }
 
@@ -1009,7 +1015,7 @@ class Controler{
         }
         catch(error){
             console.error('getScheduleById error:', error);
-            req.status(500).json({error: 'Ошибка при получении занятия расписания'});
+            res.status(500).json({error: 'Ошибка при получении занятия расписания'});
         }
     }
 
@@ -1094,7 +1100,7 @@ class Controler{
         }
         catch(error){
             console.error('getMemberships error:', error);
-            req.status(500).json({error: 'Ошибка при получении абонементов'});
+            res.status(500).json({error: 'Ошибка при получении абонементов'});
         }
     }
 
@@ -1174,7 +1180,7 @@ class Controler{
         }
         catch(error){
             console.error('getMembershipById error:', error);
-            req.status(500).json({error: 'Ошибка при получении абонемента'});
+            res.status(500).json({error: 'Ошибка при получении абонемента'});
         }
     }
 
@@ -1207,14 +1213,14 @@ class Controler{
                 });
             }
 
-            let clienId = userId;
-            if(role === 'admin' && req.body.clienId){
-                clienId = req.body.clienId;
+            let clientId = userId;
+            if(role === 'admin' && (req.body.clientId || req.body.clienId)){
+                clientId = req.body.clientId || req.body.clienId;
             }
 
             let client = await prisma.user.findFirst({
                 where: {
-                    id: clienId,
+                    id: clientId,
                     role: 'client',
                     isActive: true
                 }
@@ -1231,7 +1237,7 @@ class Controler{
                 ? new Date(startDate.getTime() + membershipType.durationDays * 24 * 60 * 60 * 1000)
                 : null;
             
-            let remainingVisits = membershipType.isUnlimited 
+            let remainingVisits = membershipType.visitCount === null 
                 ? null 
                 : membershipType.visitCount;
 
@@ -1251,8 +1257,7 @@ class Controler{
                         select: {
                             name: true,
                             visitCount: true,
-                            durationDays: true,
-                            isUnlimited: true
+                            durationDays: true
                         }
                     },
                     client: {
@@ -1284,7 +1289,7 @@ class Controler{
         }
         catch(error){
             console.error('createMembership error:', error);
-            req.status(500).json({error: 'Ошибка при создании абонемента'});
+            res.status(500).json({error: 'Ошибка при создании абонемента'});
         }
     }
 
@@ -1414,7 +1419,7 @@ class Controler{
         }
         catch(error){
             console.error('pauseMembership error:', error);
-            req.status(500).json({error: 'Ошибка при приостановке абонемента'});
+            res.status(500).json({error: 'Ошибка при приостановке абонемента'});
         }
     }
 
@@ -1514,7 +1519,7 @@ class Controler{
                     membershipType: true,
                     client: {
                         select: {
-                            if: true,
+                            id: true,
                             fullName: true,
                             email: true,
                             phone: true
@@ -1531,7 +1536,7 @@ class Controler{
         }
         catch(error){
             console.error('updateMembership error:', error);
-            req.status(500).json({error: 'Ошибка при обновлении абонемента'});
+            res.status(500).json({error: 'Ошибка при обновлении абонемента'});
         }
     }
 
@@ -1547,15 +1552,12 @@ class Controler{
                     price: true,
                     visitCount: true,
                     durationDays: true,
-                    isUnlimited: true,
-                    isActive: true,
-                    sortOrder: true
+                    isActive: true
                 },
                 where: {isActive: true},
-                orderBy: [
-                    {sortOrder: 'asc'},
-                    {price: 'asc'}
-                ]
+                orderBy: {
+                    price: 'asc'
+                }
             });
 
             res.json({
@@ -1565,7 +1567,7 @@ class Controler{
         }
         catch(error){
             console.error('getMembershipTypes error:', error);
-            req.status(500).json({error: 'Ошибка при получении типов абонементов'});
+            res.status(500).json({error: 'Ошибка при получении типов абонементов'});
         }
     }
 
@@ -1577,9 +1579,7 @@ class Controler{
                 price,
                 visitCount,
                 durationDays,
-                isUnlimited,
-                isActive,
-                sortOrder
+                isActive
             } = req.body;
 
             if(!name || price === undefined){
@@ -1606,23 +1606,9 @@ class Controler{
                 });
             }
 
-            if(isUnlimited){
-                if(visitCount !== undefined && visitCount !== null){
-                    return res.status(400).json({
-                        error: 'Для безлимитного абонемента количество занятий не указывается'
-                    });
-                }
-            } else {
-                if(!visitCount || visitCount <= 0){
-                    return res.status(400).json({
-                        error: 'Для обычного абонемента необходимо указать количество занятий (больше 0)'
-                    });
-                }
-            }
-
-            if(sortOrder !== undefined && sortOrder < 0){
+            if(visitCount !== undefined && visitCount !== null && visitCount <= 0){
                 return res.status(400).json({
-                    error: 'Порядок сортировки не может быть отрицательным'
+                    error: 'Количество занятий должно быть больше 0 или null для безлимитного типа'
                 });
             }
 
@@ -1641,11 +1627,9 @@ class Controler{
                     name,
                     description: description || null,
                     price,
-                    visitCount: isUnlimited ? null : (visitCount || null),
+                    visitCount: visitCount !== undefined ? visitCount : null,
                     durationDays: durationDays || null,
-                    isUnlimited: isUnlimited || false,
-                    isActive: isActive !== undefined ? isActive : true,
-                    sortOrder: sortOrder || 0
+                    isActive: isActive !== undefined ? isActive : true
                 }
             });
 
@@ -1657,7 +1641,7 @@ class Controler{
         }
         catch(error){
             console.error('createMembershipType error:', error);
-            req.status(500).json({error: 'Ошибка при создании типа абонемента'});
+            res.status(500).json({error: 'Ошибка при создании типа абонемента'});
         }
     }
 
@@ -1670,9 +1654,7 @@ class Controler{
                 price,
                 visitCount,
                 durationDays,
-                isUnlimited,
-                isActive,
-                sortOrder
+                isActive
             } = req.body;
 
             let existingType = await prisma.membershipType.findUnique({
@@ -1703,26 +1685,9 @@ class Controler{
                 });
             }
 
-            let newIsUnlimited = isUnlimited !== undefined ? isUnlimited : existingType.isUnlimited;
-
-            if(newIsUnlimited){
-                if(visitCount !== undefined && visitCount !== null){
-                    return res.status(400).json({
-                        error: 'Для безлимитного абонемента количество занятий не указывается'
-                    });
-                }
-            } else {
-                let newVisitCount = visitCount !== undefined ? visitCount : existingType.visitCount;
-                if(!newVisitCount || newVisitCount <= 0){
-                    return res.status(400).json({
-                        error: 'Для обычного абонемента необходимо указать количество занятий (больше 0)'
-                    });
-                }
-            }
-
-            if(sortOrder !== undefined && sortOrder < 0){
+            if(visitCount !== undefined && visitCount !== null && visitCount <= 0){
                 return res.status(400).json({
-                    error: 'Порядок сортировки не может быть отрицательным'
+                    error: 'Количество занятий должно быть больше 0 или null для безлимитного типа'
                 });
             }
 
@@ -1742,11 +1707,9 @@ class Controler{
             if(name !== undefined) membershipTypeUpdateData.name = name;
             if(description !== undefined) membershipTypeUpdateData.description = description;
             if(price !== undefined) membershipTypeUpdateData.price = price;
-            if(visitCount !== undefined) membershipTypeUpdateData.visitCount = newIsUnlimited ? null : visitCount;
+            if(visitCount !== undefined) membershipTypeUpdateData.visitCount = visitCount;
             if(durationDays !== undefined) membershipTypeUpdateData.durationDays = durationDays;
-            if(isUnlimited !== undefined) membershipTypeUpdateData.isUnlimited = isUnlimited;
             if(isActive !== undefined) membershipTypeUpdateData.isActive = isActive;
-            if(sortOrder !== undefined) membershipTypeUpdateData.sortOrder = sortOrder;
 
             let updateMembershipType = await prisma.membershipType.update({
                 where: {id},
@@ -1761,7 +1724,7 @@ class Controler{
         }
         catch(error){
             console.error('updateMembershipType error:', error);
-            req.status(500).json({error: 'Ошибка при изменении типа абонемента'});
+            res.status(500).json({error: 'Ошибка при изменении типа абонемента'});
         }
     }
 
@@ -1802,7 +1765,7 @@ class Controler{
         }
         catch(error){
             console.error('deleteMembershipType error:', error);
-            req.status(500).json({error: 'Ошибка при удалении типа абонемента'});
+            res.status(500).json({error: 'Ошибка при удалении типа абонемента'});
         }
     }
 
@@ -1814,6 +1777,7 @@ class Controler{
             let {
                 scheduleId,
                 clienId,
+                clientId,
                 status,
                 date,
                 fromDate,
@@ -1834,8 +1798,9 @@ class Controler{
                 where.scheduleId = scheduleId;
             }
 
-            if(clienId && (role === 'admin' || role === 'trainer')){
-                where.clienId = clienId;
+            let targetClientId = clientId || clienId;
+            if(targetClientId && (role === 'admin' || role === 'trainer')){
+                where.clientId = targetClientId;
             }
 
             if(status){
@@ -1930,7 +1895,7 @@ class Controler{
         }
         catch(error){
             console.error('getBookings error:', error);
-            req.status(500).json({error: 'Ошибка при получении записей на занятие'});
+            res.status(500).json({error: 'Ошибка при получении записей на занятие'});
         }
     }
 
@@ -1992,8 +1957,7 @@ class Controler{
                             membershipType: {
                                 select: {
                                     name: true,
-                                    visitCount: true,
-                                    isUnlimited: true
+                                    visitCount: true
                                 }
                             }
                         }
@@ -2026,7 +1990,7 @@ class Controler{
                     id: booking.membership.id,
                     typeName: booking.membership.membershipType.name,
                     remainingVisits: booking.membership.remainingVisits,
-                    isUnlimited: booking.membership.membershipType.isUnlimited
+                    isUnlimited: booking.membership.membershipType.visitCount === null
                 },
                 attendanceLog: booking.attendanceLog ? {
                     markedAt: booking.attendanceLog.markedAt,
@@ -2055,7 +2019,7 @@ class Controler{
         }
         catch(error){
             console.error('getBookingsBySchedule error:', error);
-            req.status(500).json({error: 'Ошибка при получении записей на занятие'});
+            res.status(500).json({error: 'Ошибка при получении записей на занятие'});
         }
     }
 
@@ -2235,7 +2199,7 @@ class Controler{
                 }
             });
 
-            if(!membership.membershipType.isUnlimited && membership.remainingVisits !== null){
+            if(membership.membershipType.visitCount !== null && membership.remainingVisits !== null){
                 await prisma.membership.update({
                     where: {id: selectedMembershipId},
                     data: {remainingVisits: membership.remainingVisits - 1}
@@ -2261,7 +2225,7 @@ class Controler{
                     membership: {
                         id: booking.membership.id,
                         typeName: booking.membership.membershipType.name,
-                        remainingVisits: membership.membershipType.isUnlimited 
+                        remainingVisits: membership.membershipType.visitCount === null
                             ? 'Безлимит' 
                             : (membership.remainingVisits - 1)
                     }
@@ -2270,7 +2234,7 @@ class Controler{
         }
         catch(error){
             console.error('createBooking error:', error);
-            req.status(500).json({error: 'Ошибка при записи на занятие'});
+            res.status(500).json({error: 'Ошибка при записи на занятие'});
         }
     }
 
@@ -2355,7 +2319,7 @@ class Controler{
                 }
             });
 
-            if(!booking.membership.membershipType.isUnlimited &&
+            if(booking.membership.membershipType.visitCount !== null &&
                 booking.membership.remainingVisits !== null &&
                 booking.status !== 'attended'
             ){
@@ -2389,7 +2353,7 @@ class Controler{
         }
         catch(error){
             console.error('cancelBooking error:', error);
-            req.status(500).json({error: 'Ошибка при отмене занятия'});
+            res.status(500).json({error: 'Ошибка при отмене занятия'});
         }
     }
 
@@ -2485,7 +2449,7 @@ class Controler{
                 }
             });
 
-            if(!attended && !booking.membership.membershipType.isUnlimited &&
+            if(!attended && booking.membership.membershipType.visitCount !== null &&
                 booking.membership.remainingVisits !== null
             ){
                 await prisma.membership.update({
@@ -2532,7 +2496,7 @@ class Controler{
         }
         catch(error){
             console.error('markAttendance error:', error);
-            req.status(500).json({error: 'Ошибка при отметке посещения'});
+            res.status(500).json({error: 'Ошибка при отметке посещения'});
         }
     }
 
@@ -2684,7 +2648,7 @@ class Controler{
         }
         catch(error){
             console.error('getHistory error:', error);
-            req.status(500).json({error: 'Ошибка при получении истории посещений'});
+            res.status(500).json({error: 'Ошибка при получении истории посещений'});
         }
     }
 
@@ -2783,7 +2747,7 @@ class Controler{
         }
         catch(error){
             console.error('getPopularClasses error:', error);
-            req.status(500).json({error: 'Ошибка при получении статистики популярных занятий'});
+            res.status(500).json({error: 'Ошибка при получении статистики популярных занятий'});
         }
     }
 
@@ -2896,7 +2860,7 @@ class Controler{
         }
         catch(error){
             console.error('getTrainersStats error:', error);
-            req.status(500).json({error: 'Ошибка при получении статистики тренеров'});
+            res.status(500).json({error: 'Ошибка при получении статистики тренеров'});
         }
     }
 
@@ -3061,7 +3025,7 @@ class Controler{
         }
         catch(error){
             console.error('getFinancialStats error:', error);
-            req.status(500).json({error: 'Ошибка при получении финансовой статистики'});
+            res.status(500).json({error: 'Ошибка при получении финансовой статистики'});
         }
     }
 
@@ -3092,7 +3056,7 @@ class Controler{
         }
         catch(error){
             console.error('getHalls error:', error);
-            req.status(500).json({error: 'Ошибка при получении списка залов'});
+            res.status(500).json({error: 'Ошибка при получении списка залов'});
         }
     }
 
@@ -3108,7 +3072,7 @@ class Controler{
                 return res.status(400).json({ error: 'Вместимость зала должна быть больше 0' });
             }
 
-            let existingHall = await prisma.hall.findUnique({
+            let existingHall = await prisma.hall.findFirst({
                 where: {name}
             });
 
@@ -3135,7 +3099,7 @@ class Controler{
         }
         catch(error){
             console.error('createHall error:', error);
-            req.status(500).json({error: 'Ошибка при добавлении нового зала'});
+            res.status(500).json({error: 'Ошибка при добавлении нового зала'});
         }
     }
 
@@ -3160,7 +3124,7 @@ class Controler{
                 }
             });
 
-            if(existingHall){
+            if(!existingHall){
                 return res.status(404).json({ error: 'Зал не найден' });
             }
 
@@ -3204,7 +3168,7 @@ class Controler{
         }
         catch(error){
             console.error('updateHall error:', error);
-            req.status(500).json({error: 'Ошибка при обновлении зала'});
+            res.status(500).json({error: 'Ошибка при обновлении зала'});
         }
     }
 
@@ -3248,7 +3212,7 @@ class Controler{
         }
         catch(error){
             console.error('deleteHall error:', error);
-            req.status(500).json({error: 'Ошибка при удалении зала'});
+            res.status(500).json({error: 'Ошибка при удалении зала'});
         }
     }
 
@@ -3278,7 +3242,7 @@ class Controler{
         }
         catch(error){
             console.error('getDanceStyles error:', error);
-            req.status(500).json({error: 'Ошибка при получении стилей танцев'});
+            res.status(500).json({error: 'Ошибка при получении стилей танцев'});
         }
     }
 
