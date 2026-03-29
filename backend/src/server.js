@@ -16,14 +16,16 @@ app.use(cors());
 app.use(express.json());
 
 // Публичные маршруты (не требуют авторизации)
-app.use('/api/auth', require('./routes/auth')); // если выделили auth отдельно
+//app.use('/api/auth', require('./route/auth')); // если выделили auth отдельно
 
 // Защищенные маршруты
-app.use('/api', authMiddleware, routes);
+//app.use('/api', authMiddleware, routes);
+
+app.use('/', routes);
 
 // Тестовый маршрут для проверки
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', message: 'Server is running' });
+     res.json({ status: 'OK', message: 'Server is running' });
 });
 
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
