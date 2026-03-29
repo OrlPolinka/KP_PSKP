@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const { start } = require('repl');
 const { isatty } = require('tty');
 const { availableMemory } = require('process');
+const e = require('express');
 
 class Controler{
 
@@ -3092,6 +3093,162 @@ class Controler{
         catch(error){
             console.error('getHalls error:', error);
             req.status(500).json({error: 'Ошибка при получении списка залов'});
+        }
+    }
+
+    async createHall(req, res){
+        try{
+            let {name, capacity, description, isActive} = req.body;
+
+            if(!name){
+                return res.status(400).json({ error: 'Название обязательно' });
+            }
+
+            if (!capacity || capacity <= 0) {
+                return res.status(400).json({ error: 'Вместимость зала должна быть больше 0' });
+            }
+
+            let existingHall = await prisma.hall.findUnique({
+                where: {name}
+            });
+
+            if(existingHall){
+                return res.status(400).json({
+                    error: 'Зал с таким названием уже существует'
+                });
+            }
+
+            let hall = await prisma.hall.create({
+                data: {
+                    name,
+                    description: description || null,
+                    capacity,
+                    isActive: isActive !== undefined ? isActive : true
+                }
+            });
+
+            res.status(201).json({
+                success: true,
+                message: 'Зал успешно создан',
+                hall
+            });
+        }
+        catch(error){
+            console.error('createHall error:', error);
+            req.status(500).json({error: 'Ошибка при добавлении нового зала'});
+        }
+    }
+
+    async updateHall(req, res){
+        try{
+            let {id} = req.params;
+            let {name, capacity, description, isActive} = req.body;
+
+            let existingHall = await prisma.hall.findUnique({
+                where: {id: parseInt(id)},
+                include: {
+                    schedules: {
+                        where: {
+                            status: {
+                                not: 'cancelled'
+                            },
+                            date: {
+                                gte: new Date()
+                            }
+                        }
+                    }
+                }
+            });
+
+            if(existingHall){
+                return res.status(404).json({ error: 'Зал не найден' });
+            }
+
+            if (name && name !== existingHall.name) {
+                let duplicate = await prisma.hall.findFirst({
+                    where: { name }
+                });
+
+                if (duplicate) {
+                    return res.status(400).json({ error: 'Зал с таким названием уже существует' });
+                }
+            }
+
+            if (capacity !== undefined && capacity <= 0) {
+                return res.status(400).json({ error: 'Вместимость зала должна быть больше 0' });
+            }
+
+            if (isActive === false && existingHall.isActive === true) {
+                if (existingHall.schedules && existingHall.schedules.length > 0) {
+                    return res.status(409).json({
+                        error: `Невозможно деактивировать зал, так как есть ${existingHall.schedules.length} запланированных занятий. Сначала перенесите или отмените эти занятия.`
+                    });
+                }
+            }
+
+            let hall = await prisma.hall.update({
+                where: { id: parseInt(id) },
+                data: {
+                    name: name !== undefined ? name : existingHall.name,
+                    capacity: capacity !== undefined ? capacity : existingHall.capacity,
+                    description: description !== undefined ? description : existingHall.description,
+                    isActive: isActive !== undefined ? isActive : existingHall.isActive
+                }
+            });
+            
+            res.json({
+                success: true,
+                message: 'Зал успешно обновлен',
+                hall
+            });
+        }
+        catch(error){
+            console.error('updateHall error:', error);
+            req.status(500).json({error: 'Ошибка при обновлении зала'});
+        }
+    }
+
+    async deleteHall(req, res){
+        try{
+            let {id} = req.params;
+
+            let existingHall = await prisma.hall.findUnique({
+                where: {
+                    id: parseInt(id)
+                },
+                include: {
+                    schedules: {
+                        where: {
+                            status: {not: 'cancelled'}
+                        }
+                    }
+                }
+            });
+
+            if(!existingHall){
+                return res.status(404).json({ error: 'Зал не найден' });
+            }
+
+            if(existingHall.schedules && existingHall.schedules.length > 0){
+                return res.status(409).json({
+                    error: `Невозможно удалить зал, так как есть ${existingHall.schedules.length} занятий в нем. Сначала удалите или перенесите эти занятия.`
+                });
+            }
+
+            await prisma.hall.delete({
+                where: {
+                    id: parseInt(id)
+                }
+            });
+
+            res.json({
+                success: true,
+                message: 'Зал успешно удален'
+            });
+        }
+        catch(error){
+            console.error('deleteHall error:', error);
+            req.status(500).json({error: 'Ошибка при удалении зала'});
         }
     }
 
