@@ -37,9 +37,9 @@ const routes = [
 
     //типы абонементов
     {method: 'get',                path: '/membership-types',                      action: 'getMembershipTypes'},
-    {method: 'post',               path: '/membershiptypes',                       action: 'createMembershipType'},
-    {method: 'put',                path: '/membershiptypes/:id',                   action: 'updateMembershipType'},
-    {method: 'delete',             path: '/membershiptypes/:id',                   action: 'deleteMembershipType'},
+    {method: 'post',               path: '/membership-types',                      action: 'createMembershipType'},
+    {method: 'put',                path: '/membership-types/:id',                  action: 'updateMembershipType'},
+    {method: 'delete',             path: '/membership-types/:id',                  action: 'deleteMembershipType'},
 
     //запись на занятия
     {method: 'get',                path: '/bookings',                              action: 'getBookings'},
@@ -56,9 +56,17 @@ const routes = [
     {method: 'get',                path: '/analytics/trainers',                    action: 'getTrainersStats'},
     {method: 'get',                path: '/analytics/financial',                   action: 'getFinancialStats'},
 
-    //залы и стили танцев
+    //залы
     {method: 'get',                path: '/halls',                                 action: 'getHalls'},
-    {method: 'get',                path: '/dance-styles',                          action: 'getDanceStyles'}
+    {method: 'post',               path: '/halls',                                 action: 'createHall'},
+    {method: 'put',                path: '/halls/:id',                             action: 'updateHall'},
+    {method: 'delete',             path: '/halls/:id',                             action: 'deleteHall'},
+
+    //стили танцев
+    {method: 'get',                path: '/dance-styles',                          action: 'getDanceStyles'},
+    {method: 'post',               path: '/dance-styles',                          action: 'createDanceStyle'},
+    {method: 'put',                path: '/dance-styles/:id',                      action: 'updateDanceStyle'},
+    {method: 'delete',             path: '/dance-styles/:id',                      action: 'deleteDanceStyle'}
     
 ];
 

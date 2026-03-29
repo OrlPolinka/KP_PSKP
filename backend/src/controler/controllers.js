@@ -1,6 +1,6 @@
 const { error } = require('console');
 const prisma = require('./prisma');
-const bcrypt = require('bcriptjs');
+const bcrypt = require('bcryptjs');
 const { stat } = require('fs');
 const jwt = require('jsonwebtoken');
 const { start } = require('repl');
@@ -90,8 +90,8 @@ class Controler{
                 });
             }
 
-            let user = prisma.user.findUnique({
-                where: email
+            let user = await prisma.user.findUnique({
+                where: {email}
             });
 
             if(!user){
@@ -145,7 +145,7 @@ class Controler{
         try{
             let userId = req.user.id;
             
-            let user = await prisma.findUnique({
+            let user = await prisma.user.findUnique({
                 where: {id: userId},
                 include: {
                     trainerInfo: true,
@@ -250,7 +250,7 @@ class Controler{
         try{
             let {id} = req.params;
 
-            let existingUser = await prisma.findUnique({
+            let existingUser = await prisma.user.findUnique({
                 where: {id}
             });
 
@@ -399,7 +399,7 @@ class Controler{
             if(email) userUpdateData.email = email;
             if(password) userUpdateData.password = await bcrypt.hash(password, 10);
             if(fullName) userUpdateData.fullName = fullName;
-            if(phone !== undefind) userUpdateData.phone = phone;
+            if(phone !== undefined) userUpdateData.phone = phone;
             if(isActive !== undefind) userUpdateData.isActive = isActive;
 
             let user = await prisma.user.update({
@@ -443,7 +443,7 @@ class Controler{
         try{
             let {id} = req.params;
 
-            let existingUser = await prisma.findUnique({
+            let existingUser = await prisma.user.findUnique({
                 where: {id},
                 include: {
                     trainerInfo: true
@@ -1822,7 +1822,7 @@ class Controler{
             let where = {};
 
             if(role === 'client'){
-                where.clienId = userId;
+                where.clientId = userId;
             } else if(role === 'trainer'){
                 where.schedule = {
                     trainerId: userId
@@ -2356,7 +2356,7 @@ class Controler{
 
             if(!booking.membership.membershipType.isUnlimited &&
                 booking.membership.remainingVisits !== null &&
-                booking.stats !== 'attended'
+                booking.status !== 'attended'
             ){
                 await prisma.membership.update({
                     where: {id: booking.membershipId},
@@ -2537,33 +2537,692 @@ class Controler{
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //история посещений
-    getHistory(req, res){
-        
+    async getHistory(req, res){
+        try{
+            let {role, id: userId} = req.user;
+            let {
+                fromDate,
+                toDate,
+                limit = 20, 
+                offset = 0
+            } = req.query;
+
+            let where = {};
+
+            if(role === 'client'){
+                where.clientId = userId;
+            } else if(role === 'trainer'){
+                where.schedule = {
+                    trainerId: userId
+                };
+            }
+
+            if (fromDate || toDate) {
+                where.bookingTime = {};
+                if (fromDate) where.bookingTime.gte = new Date(fromDate);
+                if (toDate) where.bookingTime.lte = new Date(toDate);
+            }
+
+            let bookings = await prisma.booking.findMany({
+                where: {
+                    ...where,
+                    status: {in: ['attended', 'no_show']}
+                },
+                include: {
+                    schedule: {
+                        include: {
+                            danceStyle: true,
+                            hall: true,
+                            trainer: {
+                                select: {
+                                    id: true,
+                                    fullName: true,
+                                    email: true,
+                                    phone: true
+                                }
+                            }
+                        }
+                    },
+                    client: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            email: true,
+                            phone: true
+                        }
+                    },
+                    membership: {
+                        include: {
+                            membershipType: true
+                        }
+                    },
+                    attendanceLogs: {
+                        select: {
+                            id: true,
+                            markedAt: true,
+                            notes: true,
+                            trainer: {
+                                select: {
+                                    id: true,
+                                    fullName: true
+                                }
+                            }
+                        }
+                    },
+                    history: true
+                },
+                orderBy: [{bookingTime: 'desc'}],
+                skip: parseInt(offset),
+                take: parseInt(limit)
+            });
+
+            let totalCount = await prisma.booking.count({
+                where: {
+                    ...where,
+                    status: {in: ['attended', 'no_show']}
+                }
+            });
+
+            let formattedHistory = bookings.map(booking => ({
+                id: booking.id,
+                status: booking.status,
+                bookingTime: booking.bookingTime,
+                attendedAt: booking.attendedAt,
+                schedule: {
+                    id: booking.schedule.id,
+                    date: booking.schedule.date,
+                    startTime: booking.schedule.startTime,
+                    endTime: booking.schedule.endTime,
+                    danceStyle: booking.schedule.danceStyle.name,
+                    trainer: booking.schedule.trainer.fullName,
+                    hall: booking.schedule.hall.name
+                },
+                client: role !== 'client' ? {
+                    id: booking.client.id,
+                    fullName: booking.client.fullName,
+                    email: booking.client.email,
+                    phone: booking.client.phone
+                } : undefined,  // админ и тренер видят клиента
+                membership: {
+                    id: booking.membership.id,
+                    typeName: booking.membership.membershipType.name
+                },
+                attendanceLog: booking.attendanceLog ? {
+                    markedAt: booking.attendanceLog.markedAt,
+                    markedBy: booking.attendanceLog.trainer.fullName,
+                    notes: booking.attendanceLog.notes
+                } : null,
+                historyStatus: booking.history?.status  // из таблицы bookinghistory
+            }));
+
+            let stats = null;
+            if( role === 'client'){
+                let attendedCount = bookings.filter(b => b.status === 'attended').length;
+                let noShowCount = bookings.filter(b => b.status === 'no_show').length;
+
+                stats = {
+                    totalVisits: totalCount,
+                    attended: attendedCount,
+                    noShow: noShowCount,
+                    attendanceRate: totalCount > 0 ?
+                        Math.round((attendedCount / totalCount) * 100) : 0
+                };
+            }
+
+            res.json({
+                success: true,
+                history: formattedHistory,
+                pagination: {
+                    total: totalCount,
+                    limit: parseInt(limit),
+                    offset: parseInt(offset),
+                    hasMore: (parseInt(offset) + parseInt(limit)) < totalCount
+                },
+                ...(stats && { stats })
+            });
+        }
+        catch(error){
+            console.error('getHistory error:', error);
+            req.status(500).json({error: 'Ошибка при получении истории посещений'});
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //аналитика
-    getPopularClasses(req, res){
+    async getPopularClasses(req, res){
+        try{
+            let {role} = req.user;
+            let {fromDate, toDate, limit = 10} = req.query;
 
+            if(role !== 'admin'){
+                return res.status(403).json({
+                    error: 'Доступ запрещен. Аналитика доступна только администратору'
+                });
+            }
+
+            let dateFilter = {};
+            if (fromDate || toDate) {
+                dateFilter.date = {};
+                if (fromDate) dateFilter.date.gte = new Date(fromDate);
+                if (toDate) dateFilter.date.lte = new Date(toDate);
+            }
+
+            let popularClasses = await prisma.schedule.groupBy({
+                by: ['danceStyleId'],
+                where: {
+                    ...dateFilter,
+                    status: 'completed'
+                },
+                _count: {bookings: true},
+                _avg: {
+                    currentBookings: true,
+                    maxCapacity: true
+                }
+            });
+
+            let danceStyles = await prisma.danceStyle.findMany({
+                where: {id: {in popularClasses.map(p => p.danceStyleId)}},
+                select: {
+                    id: true,
+                    name: true,
+                    description: true
+                }
+            });
+
+            let formattedResults = popularClasses
+                .map(item => {
+                    let danceStyle = danceStyles.find(ds => ds.id === item.danceStyleId);
+                    let occupancyRate = item._avg.maxCapacity 
+                        ? Math.round((item._avg.currentBookings / item._avg.maxCapacity) * 100)
+                        : 0;
+                    return {
+                        danceStyleId: item.danceStyleId,
+                        danceStyleName: danceStyle?.name || 'Неизвестно',
+                        description: danceStyle?.description,
+                        totalBookings: item._count.bookings,
+                        averageOccupancy: Math.round(item._avg.currentBookings || 0),
+                        maxCapacity: Math.round(item._avg.maxCapacity || 0),
+                        occupancyRate
+                    };
+                })
+                .sort((a, b) => b.totalBookings - a.totalBookings)
+                .slice(0, parseInt(limit));
+
+            let totalBookings = await prisma.booking.count({
+                where: {
+                    schedule: {
+                        ...dateFilter,
+                        status: 'completed'
+                    }
+                }
+            });
+
+
+            let totalSchedules = await prisma.schedule.count({
+                where: {
+                    ...dateFilter,
+                    status: 'completed'
+                }
+            });
+
+            res.json({
+                success: true,
+                period: {
+                    fromDate: fromDate || 'все время',
+                    toDate: toDate || 'настоящее время'
+                },
+                summary: {
+                    totalBookings,
+                    totalSchedules,
+                    averageBookingsPerClass: totalSchedules > 0 ?
+                        Math.round(totalBookings / totalSchedules) : 0
+                },
+                popularClasses: formattedResults
+            });
+        }
+        catch(error){
+            console.error('getPopularClasses error:', error);
+            req.status(500).json({error: 'Ошибка при получении статистики популярных занятий'});
+        }
     }
 
-    getTrainersStats(req, res){
+    async getTrainersStats(req, res){
+        try{
+            let {role} = req.user;
+            let {fromDate, toDate} = req.query;
 
+            if (role !== 'admin') {
+                return res.status(403).json({
+                    error: 'Доступ запрещен. Аналитика доступна только администратору'
+                });
+            }
+
+            let dateFilter = {};
+            if (fromDate || toDate) {
+                dateFilter.date = {};
+                if (fromDate) dateFilter.date.gte = new Date(fromDate);
+                if (toDate) dateFilter.date.lte = new Date(toDate);
+            }
+
+            let trainers = await prisma.user.findMany({
+                where: {role: 'trainer'},
+                include: {
+                    trainerInfo: true,
+                    schedulesAsTrainer: {
+                        where: {
+                            ...dateFilter,
+                            status: 'completed'
+                        },
+                        include: {
+                            bookings: {
+                                where: {
+                                    status: {in: ['attended', 'no_show']}
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            let trainersStats = trainers.map(trainer => {
+                let schedules = trainer.schedulesAsTrainer;
+                let totalClasses = schedules.length;
+                let totalBookings = schedules.reduce((sum, s) => sum + s.bookings.length, 0);
+                let attendedBookings = schedules.reduce((sum, s) => 
+                    sum + s.bookings.filter(b => b.status === 'attended').length, 0);
+                let noShowBookings = schedules.reduce((sum, s) => 
+                    sum + s.bookings.filter(b => b.status === 'no_show').length, 0);
+                
+                let averageAttendance = totalClasses > 0 
+                    ? Math.round(totalBookings / totalClasses) 
+                    : 0;
+                
+                let attendanceRate = totalBookings > 0 
+                    ? Math.round((attendedBookings / totalBookings) * 100) 
+                    : 0;
+                
+                return {
+                    id: trainer.id,
+                    fullName: trainer.fullName,
+                    email: trainer.email,
+                    phone: trainer.phone,
+                    specialization: trainer.trainerInfo?.specialization || 'Не указана',
+                    bio: trainer.trainerInfo?.bio,
+                    hireDate: trainer.trainerInfo?.hireDate,
+                    statistics: {
+                        totalClasses,
+                        totalBookings,
+                        attendedBookings,
+                        noShowBookings,
+                        averageAttendance,
+                        attendanceRate,
+                        occupancyRate: averageAttendance > 0 
+                            ? Math.round((averageAttendance / 20) * 100) 
+                            : 0  // предполагаем среднюю вместимость зала 20
+                    }
+                };
+            });
+
+            let totalClasses = trainersStats.reduce((sum, t) => sum + t.statistics.totalClasses, 0);
+            let totalBookings = trainersStats.reduce((sum, t) => sum + t.statistics.totalBookings, 0);
+            let totalAttended = trainersStats.reduce((sum, t) => sum + t.statistics.attendedBookings, 0);
+
+            let summary = {
+                totalTrainers: trainers.length,
+                totalClasses,
+                totalBookings,
+                totalAttended,
+                overallAttendanceRate: totalBookings > 0 
+                    ? Math.round((totalAttended / totalBookings) * 100) : 0,
+                averageClassesPerTrainer: trainers.length > 0 
+                    ? Math.round(totalClasses / trainers.length) : 0,
+                averageBookingsPerTrainer: trainers.length > 0 
+                    ? Math.round(totalBookings / trainers.length) : 0
+            };
+
+            let sortedStats = trainersStats.sort((a, b) => 
+                b.statistics.totalBookings - a.statistics.totalBookings);
+
+            res.json({
+                success: true,
+                period: {
+                    fromDate: fromDate || 'все время',
+                    toDate: toDate || 'настоящее время'
+                },
+                summary,
+                trainers: sortedStats
+            });
+        }
+        catch(error){
+            console.error('getTrainersStats error:', error);
+            req.status(500).json({error: 'Ошибка при получении статистики тренеров'});
+        }
     }
 
-    getFinancialStats(req, res){
+    async getFinancialStats(req, res){
+        try{
+            let {role} = req.user;
+            let { fromDate, toDate, period = 'month' } = req.query;
+            
+            if (role !== 'admin') {
+                return res.status(403).json({
+                    error: 'Доступ запрещен. Аналитика доступна только администратору'
+                });
+            }
 
+            let dateFilter = {};
+            if (fromDate || toDate) {
+                dateFilter.purchaseDate = {};
+                if (fromDate) dateFilter.purchaseDate.gte = new Date(fromDate);
+                if (toDate) dateFilter.purchaseDate.lte = new Date(toDate);
+            }
+
+            //Общая выручка
+            let totalRevenue = await prisma.membership.aggregate({
+                where: dateFilter,
+                _sum: {
+                    pricePaid: true
+                }
+            });
+
+            //Количество проданных абонементов по типам
+            let membershipsByType = await prisma.membership.groupBy({
+                by: ['membershipTypeId'],
+                where: dateFilter,
+                _count: {
+                    id: true
+                },
+                _sum: {
+                    pricePaid: true
+                }
+            });
+
+            let membershipTypes = await prisma.membershipType.findMany({
+                where: {
+                    id: { in: membershipsByType.map(m => m.membershipTypeId) }
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    price: true
+                }
+            });
+
+            let typesStats = membershipsByType.map(item => {
+                let type = membershipTypes.find(t => t.id === item.membershipTypeId);
+                return {
+                    typeId: item.membershipTypeId,
+                    typeName: type?.name || 'Неизвестно',
+                    basePrice: type?.price || 0,
+                    soldCount: item._count.id,
+                    totalRevenue: item._sum.pricePaid || 0,
+                    averagePrice: item._count.id > 0 
+                        ? Math.round((item._sum.pricePaid || 0) / item._count.id) 
+                        : 0
+                };
+            });
+
+            //Динамика продаж по периодам
+            let groupByFormat;
+            let dateField;
+
+            switch (period) {
+                case 'day':
+                    groupByFormat = '%Y-%m-%d';
+                    dateField = 'purchaseDate';
+                    break;
+                case 'week':
+                    groupByFormat = '%Y-%u';  // год-неделя
+                    dateField = 'purchaseDate';
+                    break;
+                case 'month':
+                    groupByFormat = '%Y-%m';
+                    dateField = 'purchaseDate';
+                    break;
+                case 'year':
+                    groupByFormat = '%Y';
+                    dateField = 'purchaseDate';
+                    break;
+                default:
+                    groupByFormat = '%Y-%m';
+                    dateField = 'purchaseDate';
+            }
+
+            let salesDynamics = await prisma.$queryRaw`
+                SELECT 
+                    TO_CHAR(${dateField}, ${groupByFormat}) as period,
+                    COUNT(*) as count,
+                    SUM(price_paid) as revenue
+                FROM memberships
+                WHERE ${dateFilter.purchaseDate?.gte ? `purchase_date >= ${dateFilter.purchaseDate.gte}` : '1=1'}
+                AND ${dateFilter.purchaseDate?.lte ? `purchase_date <= ${dateFilter.purchaseDate.lte}` : '1=1'}
+                GROUP BY period
+                ORDER BY period ASC
+            `;
+
+            //Активные абонементы
+            let activeMemberships = await prisma.membership.count({
+                where: {
+                    status: 'active',
+                    ...dateFilter
+                }
+            });
+
+            //Средний чек
+            let totalSold = await prisma.membership.count({
+                where: dateFilter
+            });
+
+            let averageCheck = totalSold > 0 
+                ? Math.round((totalRevenue._sum.pricePaid || 0) / totalSold) 
+                : 0;
+
+            //Прогноз на следующий период
+            let previousPeriodRevenue = await prisma.membership.aggregate({
+                where: {
+                    purchaseDate: {
+                        lt: dateFilter.purchaseDate?.gte || new Date(),
+                        gte: dateFilter.purchaseDate?.gte 
+                            ? new Date(new Date(dateFilter.purchaseDate.gte).setMonth(new Date(dateFilter.purchaseDate.gte).getMonth() - 1))
+                            : new Date(new Date().setMonth(new Date().getMonth() - 1))
+                    }
+                },
+                _sum: {
+                    pricePaid: true
+                }
+            });
+
+            let growthRate = previousPeriodRevenue._sum.pricePaid && previousPeriodRevenue._sum.pricePaid > 0
+                ? Math.round(((totalRevenue._sum.pricePaid - previousPeriodRevenue._sum.pricePaid) / previousPeriodRevenue._sum.pricePaid) * 100)
+                : 0;
+
+            res.json({
+                success: true,
+                period: {
+                    fromDate: fromDate || 'все время',
+                    toDate: toDate || 'настоящее время',
+                    groupBy: period
+                },
+                summary: {
+                    totalRevenue: totalRevenue._sum.pricePaid || 0,
+                    totalSoldMemberships: totalSold,
+                    averageCheck,
+                    activeMemberships,
+                    growthRate: growthRate + '%'
+                },
+                byMembershipType: typesStats,
+                dynamics: salesDynamics,
+                forecast: {
+                    nextPeriodRevenue: Math.round((totalRevenue._sum.pricePaid || 0) * (1 + growthRate / 100)),
+                    estimatedGrowth: growthRate + '%'
+                }
+            });
+        }
+        catch(error){
+            console.error('getFinancialStats error:', error);
+            req.status(500).json({error: 'Ошибка при получении финансовой статистики'});
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    //залы и стили танцев
-    getHalls(req, res){
+    //залы
+    async getHalls(req, res){
+        try{
+            let halls = await prisma.hall.findMany({
+                select: {
+                    id: true,
+                    name: true,
+                    capacity: true,
+                    description: true,
+                    isActive: true,
+                },
+                where: {
+                    isActive: true
+                },
+                orderBy: {
+                    name: 'asc'
+                }
+            });
 
+            res.json({
+                success: true,
+                halls
+            });
+        }
+        catch(error){
+            console.error('getHalls error:', error);
+            req.status(500).json({error: 'Ошибка при получении списка залов'});
+        }
     }
 
-    getDanceStyles(req, res){
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //стили танцев
+    async getDanceStyles(req, res){
+        try{
+            let danceStyles = await prisma.danceStyle.findMany({
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    isActive: true
+                },
+                where: {
+                    isActive: true
+                },
+                orderBy: {
+                    name: 'asc'
+                }
+            });
 
+            res.json({
+                success: true,
+                danceStyles
+            });
+        }
+        catch(error){
+            console.error('getDanceStyles error:', error);
+            req.status(500).json({error: 'Ошибка при получении стилей танцев'});
+        }
     }
+
+    async createDanceStyle(req, res) {
+        try {
+            let { name, description, isActive } = req.body;
+            
+            if (!name) {
+                return res.status(400).json({ error: 'Название обязательно' });
+            }
+            
+            let existing = await prisma.danceStyle.findUnique({
+                where: { name }
+            });
+            
+            if (existing) {
+                return res.status(400).json({ error: 'Стиль с таким названием уже существует' });
+            }
+            
+            let danceStyle = await prisma.danceStyle.create({
+                data: {
+                    name,
+                    description: description || null,
+                    isActive: isActive !== undefined ? isActive : true
+                }
+            });
+            
+            res.status(201).json({ success: true, danceStyle });
+        } catch (error) {
+            console.error('createDanceStyle error:', error);
+            res.status(500).json({ error: 'Ошибка при создании стиля танца' });
+        }
+    }
+
+    async updateDanceStyle(req, res) {
+        try {
+            let { id } = req.params;
+            let { name, description, isActive } = req.body;
+            
+            let existing = await prisma.danceStyle.findUnique({
+                where: { id: parseInt(id) }
+            });
+            
+            if (!existing) {
+                return res.status(404).json({ error: 'Стиль не найден' });
+            }
+            
+            if (name && name !== existing.name) {
+                let duplicate = await prisma.danceStyle.findUnique({
+                    where: { name }
+                });
+                if (duplicate) {
+                    return res.status(400).json({ error: 'Стиль с таким названием уже существует' });
+                }
+            }
+            
+            let danceStyle = await prisma.danceStyle.update({
+                where: { id: parseInt(id) },
+                data: {
+                    name: name || existing.name,
+                    description: description !== undefined ? description : existing.description,
+                    isActive: isActive !== undefined ? isActive : existing.isActive
+                }
+            });
+            
+            res.json({ success: true, danceStyle });
+        } catch (error) {
+            console.error('updateDanceStyle error:', error);
+            res.status(500).json({ error: 'Ошибка при обновлении стиля танца' });
+        }
+    }
+
+    async deleteDanceStyle(req, res) {
+        try {
+            let { id } = req.params;
+            
+            let existing = await prisma.danceStyle.findUnique({
+                where: { id: parseInt(id) },
+                include: { schedules: true }
+            });
+            
+            if (!existing) {
+                return res.status(404).json({ error: 'Стиль не найден' });
+            }
+            
+            if (existing.schedules.length > 0) {
+                return res.status(409).json({ error: 'Нельзя удалить стиль, так как есть занятия с ним' });
+            }
+            
+            await prisma.danceStyle.delete({
+                where: { id: parseInt(id) }
+            });
+            
+            res.json({ success: true, message: 'Стиль танца удален' });
+        } catch (error) {
+            console.error('deleteDanceStyle error:', error);
+            res.status(500).json({ error: 'Ошибка при удалении стиля танца' });
+        }
+    }
+
+
 }
 
 module.exports = Controler;

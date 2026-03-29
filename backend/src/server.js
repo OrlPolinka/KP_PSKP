@@ -1,7 +1,7 @@
-const express = require('experss');
+const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const route = require('./route/routes')
+const routes = require('./route/routes')
 const {authMiddleware} = require('./middleware/auth')
 
 dotenv.config();
@@ -21,4 +21,9 @@ app.use('/api/auth', require('./routes/auth')); // если выделили aut
 // Защищенные маршруты
 app.use('/api', authMiddleware, routes);
 
-app.listen(PORT, () => console.log(`http://localhost:${PORT}`));
+// Тестовый маршрут для проверки
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'OK', message: 'Server is running' });
+});
+
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
