@@ -2280,8 +2280,111 @@ class Controler{
             let {reason} = req.body;
 
             let booking = await prisma.booking.findUnique({
-                
-            })
+                where: {id},
+                include: {
+                    schedule: {
+                        include: {
+                            danceStyle: true,
+                            hall: true
+                        }
+                    },
+                    client: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            email: true
+                        }
+                    },
+                    membership: {
+                        include: {
+                            membershipType: true
+                        }
+                    }
+                }
+            });
+
+            if(!booking){
+                return res.status(404).json({
+                    error: 'Запись не найдена'
+                });
+            }
+
+            let isOwner = booking.clientId === userId;
+            let isAdmin = role === 'admin';
+            let isTrainer = role === 'trainer' && booking.schedule.trainerId === userId;
+
+            if(!isOwner && !isAdmin && !isTrainer){
+                return res.status(403).json({
+                    error: 'Вы можете отменить только свои записи'
+                });
+            }
+
+            if(booking.status === 'cancelled'){
+                return res.status(400).json({
+                    error: 'Запись уже отменена'
+                });
+            }
+
+            let now = new Date();
+            let scheduleDateTime = new Date(booking.schedule.date);
+            let [startHour, startMinute] = booking.schedule.startTime.toISOString().split('T')[1].split(':');
+            scheduleDateTime.setHours(parseInt(startHour), parseInt(startMinute));
+
+            if(isOwner && !isAdmin){
+                let hoursBeforeStart = (scheduleDateTime - now) / (1000 * 60 * 60);
+                if(hoursBeforeStart < 2){
+                    return res.status(400).json({
+                        error: 'Отмена записи возможна не позднее чем за 2 часа до начала занятия'
+                    });
+                }
+            }
+
+            let updateBooking = await prisma.booking.update({
+                where: {id},
+                data: {
+                    status: 'cancelled',
+                    cancelledAt: new Date()
+                }
+            });
+
+            await prisma.schedule.update({
+                where: {id: booking.scheduleId},
+                data: {
+                    currentBookings: Math.max(0, booking.schedule.currentBookings - 1)
+                }
+            });
+
+            if(!booking.membership.membershipType.isUnlimited &&
+                booking.membership.remainingVisits !== null &&
+                booking.stats !== 'attended'
+            ){
+                await prisma.membership.update({
+                    where: {id: booking.membershipId},
+                    data: {
+                        remainingVisits: booking.membership.remainingVisits + 1
+                    }
+                });
+            }
+
+            await prisma.bookingHistory.create({
+                data:{
+                    bookingId: id,
+                    status: 'cancelled',
+                    changedBy: userId,
+                    changedAt: new Date(),
+                    reason: reason || (isOwner ? 'Отменено клиентом' : 'Отменено администратором/тренером')
+                }
+            });
+
+            res.json({
+                success: true,
+                message: 'Запись успешно отменена',
+                booking: {
+                    id: updateBooking.id,
+                    status: updateBooking.status,
+                    cancelledAt: updateBooking.cancelledAt
+                }
+            });
         }
         catch(error){
             console.error('cancelBooking error:', error);
@@ -2289,14 +2392,153 @@ class Controler{
         }
     }
 
-    markAttendance(req, res){
+    async markAttendance(req, res){
+        try{
+            let {id} = req.params;
+            let {role, id: userId} = req.user;
+            let {attended, notes} = req.body;
 
+            let booking = await prisma.booking.findUnique({
+                where: {id},
+                include: {
+                    schedule: {
+                        include: {
+                            danceStyle: true,
+                            hall: true
+                        }
+                    },
+                    client: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            email: true,
+                            phone: true
+                        }
+                    },
+                    membership: {
+                        include: {
+                            membershipType: true
+                        }
+                    }
+                }
+            });
+
+            if(!booking){
+                return res.status(404).json({
+                    error: 'Запись не найдена'
+                });
+            }
+
+            let isTrainer = booking.schedule.trainerId === userId;
+            let isAdmin = role === 'admin';
+
+            if(!isTrainer && !isAdmin){
+                return res.status(403).json({
+                    error: 'Только тренер этого занятия или администратор могут отмечать посещения'
+                });
+            }
+
+            if(booking.status === 'cancelled'){
+                return res.status(400).json({
+                    error: 'Нельзя отметить посещение отмененной записи'
+                });
+            }
+
+            if(booking.status === 'attended'){
+                return res.status(400).json({
+                    error: 'Посещение уже отмечено'
+                });
+            }
+
+            if(booking.status === 'no_show'){
+                return res.status(400).json({
+                    error: 'Клиент уже отмечен как не пришедший'
+                });
+            }      
+            
+            let now = new Date();
+            let scheduleDateTime = new Date(booking.schedule.date);
+            let [startHour, startMinute] = booking.schedule.startTime.toISOString().split('T')[1].split(':');
+            scheduleDateTime.setHours(parseInt(startHour), parseInt(startMinute));
+
+            let [endHour, endMinute] = booking.schedule.endTime.toISOString().split('T')[1].split(':');
+            let endDateTime = new Date(booking.schedule.date);
+            endDateTime.setHours(parseInt(endHour), parseInt(endMinute));
+
+            if(endDateTime < now){
+
+            }
+            else if(scheduleDateTime > now){
+                return res.status(400).json({
+                    error: 'Нельзя отметить посещение до начала занятия'
+                });
+            }
+
+            let newStatus = attended ? 'attended' : 'no_show';
+
+            let updatedBooking = await prisma.booking.update({
+                where: {id},
+                data: {
+                    status: newStatus,
+                    attendedAt: attended ? new Date() : null
+                }
+            });
+
+            if(!attended && !booking.membership.membershipType.isUnlimited &&
+                booking.membership.remainingVisits !== null
+            ){
+                await prisma.membership.update({
+                    where: {id: booking.membershipId},
+                    data: {
+                        remainingVisits: booking.membership.remainingVisits + 1
+                    }
+                });
+            }
+
+            let attendanceLog = await prisma.attendanceLog.create({
+                data: {
+                    bookingId: id,
+                    trainerId: userId,
+                    markedAt: new Date(),
+                    notes: notes || null
+                }
+            });
+
+            await prisma.bookingHistory.create({
+                data: {
+                    bookingId: id,
+                    status: newStatus,
+                    changedBy: userId,
+                    changedAt: new Date(),
+                    reason: notes || (attended ? 'Клиент присутствовал' : 'Клиент не пришел')
+                }
+            });
+
+            res.json({
+                succes: true,
+                message: attended ? 'Посещение отмечено' : 'Клиент отмечен как не пришедший',
+                booking: {
+                    id: updatedBooking.id,
+                    status: updatedBooking.status,
+                    attendedAt: updatedBooking.attendedAt
+                },
+                attendanceLog: {
+                    id: attendanceLog.id,
+                    markedAt: attendanceLog.markedAt,
+                    notes: attendanceLog.notes
+                }
+            });
+        }
+        catch(error){
+            console.error('markAttendance error:', error);
+            req.status(500).json({error: 'Ошибка при отметке посещения'});
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //история посещений
     getHistory(req, res){
-
+        
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
