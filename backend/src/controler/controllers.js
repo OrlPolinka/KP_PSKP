@@ -1773,7 +1773,7 @@ class Controler{
                 include: {
                     memberships: {
                         where: {
-                            status: {in ['active', 'paused']}
+                            status: {in: ['active', 'paused']}
                         }
                     }
                 }
@@ -2721,7 +2721,7 @@ class Controler{
             });
 
             let danceStyles = await prisma.danceStyle.findMany({
-                where: {id: {in popularClasses.map(p => p.danceStyleId)}},
+                where: {id: {in: popularClasses.map(p => p.danceStyleId)}},
                 select: {
                     id: true,
                     name: true,
