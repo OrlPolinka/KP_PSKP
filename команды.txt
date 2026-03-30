@@ -1,0 +1,428 @@
+регистрация(без токенов)
+
+POST http://localhost:5000/api/auth/register
+{
+    "email": "admin@studio.com",
+    "password": "admin123",
+    "fullName": "Администратор",
+    "phone": "+79991234567",
+    "role": "admin"
+}
+
+
+{
+    "email": "client@test.com",
+    "password": "client123",
+    "fullName": "Тестовый Клиент",
+    "phone": "+79991112233",
+    "role": "client"
+}
+
+
+{
+    "email": "trainer@studio.com",
+    "password": "trainer123",
+    "fullName": "Иван Тренеров",
+    "phone": "+79991112244",
+    "role": "trainer"
+}
+
+
+POST http://localhost:5000/api/auth/login
+{
+    "email": "admin@studio.com",
+    "password": "admin123"
+}
+
+
+
+
+пользователи(только админ)
+
+### 5. Получить всех пользователей
+GET http://localhost:5000/api/users
+Authorization: Bearer {{admin_token}}
+
+### 6. Получить пользователя по ID (замените на реальный ID клиента)
+GET http://localhost:5000/api/users/UUID_КЛИЕНТА
+Authorization: Bearer {{admin_token}}
+
+### 7. Заблокировать пользователя
+PUT http://localhost:5000/api/users/UUID_КЛИЕНТА/block
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+    "isActive": false
+}
+
+### 7.1. Разблокировать пользователя
+PUT http://localhost:5000/api/users/UUID_КЛИЕНТА/block
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+    "isActive": true
+}
+
+### 8. Удалить пользователя
+DELETE http://localhost:5000/api/users/UUID_КЛИЕНТА
+Authorization: Bearer {{admin_token}}
+
+
+
+
+тренеры(только админ)
+### 9. Получить всех тренеров
+GET http://localhost:5000/api/trainers
+Authorization: Bearer {{admin_token}}
+
+### 10. Создать нового тренера
+POST http://localhost:5000/api/trainers
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+    "email": "newtrainer@studio.com",
+    "password": "trainer123",
+    "fullName": "Новый Тренер",
+    "phone": "+79991112255",
+    "specialization": "Contemporary, Jazz",
+    "bio": "Опытный тренер"
+}
+
+### 11. Обновить тренера
+PUT http://localhost:5000/api/trainers/UUID_ТРЕНЕРА
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+    "specialization": "Zumba, Hip-Hop, Contemporary",
+    "bio": "Обновленная биография"
+}
+
+### 12. Удалить тренера
+DELETE http://localhost:5000/api/trainers/UUID_ТРЕНЕРА
+Authorization: Bearer {{admin_token}}
+
+
+
+
+
+ЗАЛЫ (админ для создания/изменения/удаления, все для просмотра)
+
+GET http://localhost:5000/api/halls
+
+
+POST http://localhost:5000/api/halls
+{
+    "name": "Большой зал",
+    "capacity": 20,
+    "description": "Зал с зеркалами",
+    "isActive": true
+}
+
+{
+    "name": "Малый зал",
+    "capacity": 10,
+    "description": "Для индивидуальных занятий",
+    "isActive": true
+}
+
+
+### 15. Обновить зал
+PUT http://localhost:5000/api/halls/1
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+    "capacity": 25,
+    "description": "Обновленное описание зала"
+}
+
+### 16. Удалить зал (только если нет занятий)
+DELETE http://localhost:5000/api/halls/2
+Authorization: Bearer {{admin_token}}
+
+
+
+
+
+СТИЛИ ТАНЦЕВ (админ для создания/изменения/удаления)
+
+GET http://localhost:5000/api/dance-styles
+
+
+POST http://localhost:5000/api/dance-styles### 
+{
+    "name": "Zumba",
+    "description": "Энергичные танцы",
+    "isActive": true
+}
+
+{
+    "name": "Hip-Hop",
+    "description": "Уличные танцы",
+    "isActive": true
+}
+
+19. Обновить стиль танца
+PUT http://localhost:5000/api/dance-styles/1
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+    "description": "Латиноамериканские танцы для начинающих"
+}
+
+### 20. Удалить стиль танца (только если нет занятий)
+DELETE http://localhost:5000/api/dance-styles/3
+Authorization: Bearer {{admin_token}}
+
+
+
+
+
+РАСПИСАНИЕ
+
+GET http://localhost:5000/api/schedule
+http://localhost:5000/api/schedule?date=2025-04-15
+http://localhost:5000/api/schedule?fromDate=2025-04-01&toDate=2025-04-30
+
+### 22. Получить занятие по ID
+GET http://localhost:5000/api/schedule/UUID_ЗАНЯТИЯ
+Authorization: Bearer {{admin_token}}
+
+POST http://localhost:5000/api/schedule
+{
+    "danceStyleId": 1,
+    "trainerId": "UUID_ТРЕНЕРА",
+    "hallId": 1,
+    "date": "2025-04-15",
+    "startTime": "10:00:00",
+    "endTime": "11:30:00",
+    "maxCapacity": 15
+}
+
+### 24. Обновить занятие
+PUT http://localhost:5000/api/schedule/UUID_ЗАНЯТИЯ
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+    "maxCapacity": 12,
+    "status": "cancelled",
+    "cancellationReason": "Болезнь тренера"
+}
+
+### 25. Удалить занятие (только если нет записей)
+DELETE http://localhost:5000/api/schedule/UUID_ЗАНЯТИЯ
+Authorization: Bearer {{admin_token}}
+
+
+
+
+
+ТИПЫ АБОНЕМЕНТОВ
+
+GET http://localhost:5000/api/membership-types
+
+POST http://localhost:5000/api/membership-types
+{
+    "name": "Разовое занятие",
+    "description": "Одно занятие",
+    "price": 500,
+    "visitCount": 1,
+    "durationDays": null
+}
+
+{
+    "name": "Абонемент на 4 занятия",
+    "description": "4 занятия в течение 30 дней",
+    "price": 1800,
+    "visitCount": 4,
+    "durationDays": 30
+}
+
+### 28. Обновить тип абонемента
+PUT http://localhost:5000/api/membership-types/1
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+    "price": 600,
+    "description": "Обновленное описание"
+}
+
+### 29. Удалить тип абонемента (только если нет активных абонементов)
+DELETE http://localhost:5000/api/membership-types/1
+Authorization: Bearer {{admin_token}}
+
+
+
+
+
+АБОНЕМЕНТЫ КЛИЕНТОВ
+
+### 30. Получить свои абонементы (клиент)
+GET http://localhost:5000/api/memberships
+Authorization: Bearer {{client_token}}
+
+### 31. Получить все абонементы (админ)
+GET http://localhost:5000/api/memberships
+Authorization: Bearer {{admin_token}}
+
+### 32. Получить свой абонемент по ID (клиент)
+GET http://localhost:5000/api/memberships/UUID_АБОНЕМЕНТА
+Authorization: Bearer {{client_token}}
+
+### 33. Получить любой абонемент (админ)
+GET http://localhost:5000/api/memberships/UUID_АБОНЕМЕНТА
+Authorization: Bearer {{admin_token}}
+
+POST http://localhost:5000/api/memberships
+{
+    "membershipTypeId": 2
+}
+
+### 35. Админ покупает абонемент клиенту
+POST http://localhost:5000/api/memberships
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+    "membershipTypeId": 2,
+    "clientId": "UUID_КЛИЕНТА"
+}
+
+### 36. Приостановить абонемент
+PUT http://localhost:5000/api/memberships/UUID_АБОНЕМЕНТА/pause
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+    "status": "paused"
+}
+
+### 36.1. Активировать абонемент
+PUT http://localhost:5000/api/memberships/UUID_АБОНЕМЕНТА/pause
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+    "status": "active"
+}
+
+### 37. Обновить абонемент (админ)
+PUT http://localhost:5000/api/memberships/UUID_АБОНЕМЕНТА
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+    "remainingVisits": 5,
+    "status": "expired"
+}
+
+
+
+
+
+
+ЗАПИСИ НА ЗАНЯТИЯ
+
+### 38. Получить свои записи (клиент)
+GET http://localhost:5000/api/bookings
+Authorization: Bearer {{client_token}}
+
+### 39. Получить записи на свои занятия (тренер)
+GET http://localhost:5000/api/bookings
+Authorization: Bearer {{trainer_token}}
+
+### 41. Получить записи на конкретное занятие (тренер)
+GET http://localhost:5000/api/bookings/schedule/UUID_ЗАНЯТИЯ
+Authorization: Bearer {{trainer_token}}
+
+### 42. Записаться на занятие (клиент)
+POST http://localhost:5000/api/bookings
+Authorization: Bearer {{client_token}}
+Content-Type: application/json
+
+{
+    "scheduleId": "UUID_ЗАНЯТИЯ"
+}
+
+### 43. Отменить запись (клиент)
+PUT http://localhost:5000/api/bookings/UUID_ЗАПИСИ/cancel
+Authorization: Bearer {{client_token}}
+Content-Type: application/json
+
+{
+    "reason": "Не могу прийти"
+}
+
+### 44. Отметить посещение (тренер)       ????????????????????????????????
+PUT http://localhost:5000/api/bookings/UUID_ЗАПИСИ/attend
+Authorization: Bearer {{trainer_token}}
+Content-Type: application/json
+
+{
+    "attended": true
+}
+
+### 44.1. Отметить неявку (тренер)        ?????????????????????????????????
+PUT http://localhost:5000/api/bookings/UUID_ЗАПИСИ/attend
+Authorization: Bearer {{trainer_token}}
+Content-Type: application/json
+
+{
+    "attended": false
+}
+
+
+
+
+
+
+ИСТОРИЯ ПОСЕЩЕНИЙ
+
+### 45. Получить историю посещений (клиент)
+GET http://localhost:5000/api/history
+Authorization: Bearer {{client_token}}
+
+### 46. Получить историю (тренер)
+GET http://localhost:5000/api/history
+Authorization: Bearer {{trainer_token}}
+
+### 47. Получить историю (админ)
+GET http://localhost:5000/api/history
+Authorization: Bearer {{admin_token}}
+
+### С пагинацией
+GET http://localhost:5000/api/history?limit=10&offset=0
+Authorization: Bearer {{client_token}}
+
+### За период
+GET http://localhost:5000/api/history?fromDate=2025-04-01&toDate=2025-04-30
+Authorization: Bearer {{client_token}}
+
+
+
+
+
+АНАЛИТИКА (только админ)
+
+### 48. Популярные занятия
+GET http://localhost:5000/api/analytics/popular?limit=5
+Authorization: Bearer {{admin_token}}
+
+### 49. Статистика тренеров
+GET http://localhost:5000/api/analytics/trainers?fromDate=2025-04-01&toDate=2025-04-30
+Authorization: Bearer {{admin_token}}
+
+### 50. Финансовая статистика
+GET http://localhost:5000/api/analytics/financial?period=month
+Authorization: Bearer {{admin_token}}
+
+
+
+

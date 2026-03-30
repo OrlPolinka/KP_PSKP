@@ -184,7 +184,8 @@ class Controler{
                     isActive: true,
                     createdAt: true
                 },
-                orderBy: {createdAt: 'desc'}
+                // В модели Membership нет createdAt, сортируем по времени покупки.
+                orderBy: {purchaseDate: 'desc'}
             });
 
             res.json({users});
@@ -259,7 +260,7 @@ class Controler{
                 return res.status(404).json({error: 'Пользователь не найден'});
             }
 
-            let user = prisma.user.delete({
+            let user = await prisma.user.delete({
                 where: {id}
             });
 
@@ -288,7 +289,8 @@ class Controler{
                 include: {
                     trainerInfo: true
                 },
-                orderBy: {createdAt: 'desc'}
+                // В модели Membership нет createdAt, сортируем по дате покупки.
+                orderBy: {purchaseDate: 'desc'}
             });
 
             let trainersWithoutPassword = trainers.map(trainer => {
@@ -337,6 +339,16 @@ class Controler{
                 }
             });
 
+            // Создаем профиль тренера (Trainer) для user'а.
+            let trainer = await prisma.trainer.create({
+                data: {
+                    id: user.id,      // логика в проекте: trainer.id = user.id
+                    userId: user.id,
+                    specialization: specialization || null,
+                    bio: bio || null
+                }
+            });
+
             let token = jwt.sign(
                 {
                     id: user.id,
@@ -354,10 +366,7 @@ class Controler{
                 message: 'Тренер успешно создан',
                 token,
                 user: userWithoutPassword,
-                trainer: {
-                    specialization: trainer.specialization,
-                    bio: trainer.bio
-                }
+                trainer
             });
         }
         catch(error){
@@ -401,7 +410,7 @@ class Controler{
             if(password) userUpdateData.password = await bcrypt.hash(password, 10);
             if(fullName) userUpdateData.fullName = fullName;
             if(phone !== undefined) userUpdateData.phone = phone;
-            if(isActive !== undefind) userUpdateData.isActive = isActive;
+            if(isActive !== undefined) userUpdateData.isActive = isActive;
 
             let user = await prisma.user.update({
                 where: {id},
@@ -409,8 +418,8 @@ class Controler{
             });
 
             let trainerUpdateData = {};
-            if(specialization !== undefind) trainerUpdateData.specialization = specialization;
-            if(bio !== undefind) trainerUpdateData.bio = bio;
+            if(specialization !== undefined) trainerUpdateData.specialization = specialization;
+            if(bio !== undefined) trainerUpdateData.bio = bio;
 
             if(Object.keys(trainerUpdateData).length > 0){
                 await prisma.trainer.update({
@@ -459,7 +468,7 @@ class Controler{
                 return res.status(400).json({error: 'Пользователь не является тренером'});
             }
 
-            let deletedUser = prisma.user.delete({
+            let deletedUser = await prisma.user.delete({
                 where: {id}
             });
 
@@ -490,15 +499,36 @@ class Controler{
             }
 
             let createdBy = req.user.id;
+            if(!createdBy){
+                return res.status(401).json({ error: 'Не удалось определить пользователя из токена' });
+            }
 
-            if(!danceStyleId || !trainerId || !hallId || !startTime || !endTime || !maxCapacity || !date){
+            // Проверяем, что пользователь существует в БД (иначе будет FK violation).
+            let createdByUser = await prisma.user.findUnique({
+                where: { id: createdBy },
+                select: { id: true }
+            });
+            if(!createdByUser){
+                return res.status(401).json({ error: 'Пользователь из токена не найден' });
+            }
+
+            let danceStyleIdValue = parseInt(danceStyleId);
+            let hallIdValue = parseInt(hallId);
+            let maxCapacityValue = parseInt(maxCapacity);
+            if(Number.isNaN(danceStyleIdValue) || Number.isNaN(hallIdValue) || Number.isNaN(maxCapacityValue)){
+                return res.status(400).json({
+                    error: 'danceStyleId, hallId и maxCapacity должны быть числами'
+                });
+            }
+
+            if(!danceStyleIdValue || !trainerId || !hallIdValue || !startTime || !endTime || !maxCapacityValue || !date){
                 return res.status(400).json({
                     error: 'Танцевальное направление, тренер, зал, начальное и конечное время, максимальная вместимость и дата обязательны'
                 });
             }
 
             let danceStyle = await prisma.danceStyle.findUnique({
-                where: {id: danceStyleId}
+                where: {id: danceStyleIdValue}
             });
 
             if(!danceStyle){
@@ -521,8 +551,28 @@ class Controler{
                 });
             }
 
+            // В Prisma Schedule.trainerId ссылается на Trainer.id,
+            // а с фронта часто приходит User.id (id тренера).
+            // Поэтому маппим trainerId(User) -> trainer.id(Trainer).
+            let trainerRecord = await prisma.trainer.findFirst({
+                where: {
+                    OR: [
+                        { id: trainer.id },
+                        { userId: trainer.id }
+                    ]
+                }
+            });
+
+            if(!trainerRecord){
+                return res.status(404).json({
+                    error: 'Профиль тренера (Trainer) не найден'
+                });
+            }
+
+            let actualTrainerId = trainerRecord.id;
+
             let hall = await prisma.hall.findUnique({
-                where: {id: hallId}
+                where: {id: hallIdValue}
             })
 
             if(!hall){
@@ -531,28 +581,38 @@ class Controler{
                 });
             }
 
-            if(maxCapacity > hall.capacity){
+            if(maxCapacityValue > hall.capacity){
                 return res.status(400).json({
                     error: `Максимальная вместимость не может превышать вместимость зала: ${hall.capacity}`
                 });
             }
 
+            // startTime/endTime в запросе приходят как строка "HH:mm:ss",
+            // а в Prisma это DateTime @db.Time, поэтому для фильтрации нужно передавать Date.
+            let startTimeDate = new Date(`1970-01-01T${startTime}`);
+            let endTimeDate = new Date(`1970-01-01T${endTime}`);
+            if (Number.isNaN(startTimeDate.getTime()) || Number.isNaN(endTimeDate.getTime())) {
+                return res.status(400).json({
+                    error: 'Некорректный формат startTime/endTime. Ожидается "HH:mm:ss"'
+                });
+            }
+
             let hallSchedule = await prisma.schedule.findFirst({
                 where: {
-                    hallId,
+                    hallId: hallIdValue,
                     date: new Date(date),
                     status: {not: 'cancelled'},
                     OR: [
                         {
                             AND: [
-                                {startTime: {lte: startTime}},
-                                {endTime: {gt: endTime}}
+                                {startTime: {lte: startTimeDate}},
+                                {endTime: {gt: endTimeDate}}
                             ]
                         },
                         {
                             AND: [
-                                {startTime: {lt: startTime}},
-                                {endTime: {gte: endTime}}
+                                {startTime: {lt: startTimeDate}},
+                                {endTime: {gte: endTimeDate}}
                             ]
                         }
                     ]
@@ -567,20 +627,20 @@ class Controler{
 
             let trainerSchedule = await prisma.schedule.findFirst({
                 where: {
-                    trainerId,
+                    trainerId: actualTrainerId,
                     date: new Date(date),
                     status: {not: 'cancelled'},
                     OR: [
                         {
                             AND: [
-                                {startTime: {lte: startTime}},
-                                {endTime: {gt: endTime}}
+                                {startTime: {lte: startTimeDate}},
+                                {endTime: {gt: endTimeDate}}
                             ]
                         },
                         {
                             AND: [
-                                {startTime: {lt: startTime}},
-                                {endTime: {gte: endTime}}
+                                {startTime: {lt: startTimeDate}},
+                                {endTime: {gte: endTimeDate}}
                             ]
                         }
                     ]
@@ -595,13 +655,13 @@ class Controler{
 
             let schedule = await prisma.schedule.create({
                 data: {
-                    danceStyleId,
-                    trainerId,
-                    hallId,
+                    danceStyleId: danceStyleIdValue,
+                    trainerId: actualTrainerId,
+                    hallId: hallIdValue,
                     date: new Date(date),
-                    startTime:  new Date(`1970-01-01T${startTime}`),
-                    endTime:  new Date(`1970-01-01T${endTime}`),
-                    maxCapacity,
+                    startTime: startTimeDate,
+                    endTime: endTimeDate,
+                    maxCapacity: maxCapacityValue,
                     currentBookings: 0,
                     status: status || 'scheduled',
                     cancellationReason: cancellationReason || null,
@@ -612,13 +672,32 @@ class Controler{
                     trainer: {
                         select: {
                             id: true,
-                            fullName: true,
-                            email: true
+                            specialization: true,
+                            bio: true,
+                            hireDate: true,
+                            user: {
+                                select: {
+                                    fullName: true,
+                                    email: true,
+                                    phone: true
+                                }
+                            }
                         }
                     },
                     hall: true
                 }
             });
+
+            // Приводим ответ к старому формату: fullName/email/phone на уровне `trainer`.
+            if (schedule?.trainer?.user) {
+                schedule.trainer = {
+                    ...schedule.trainer,
+                    fullName: schedule.trainer.user.fullName,
+                    email: schedule.trainer.user.email,
+                    phone: schedule.trainer.user.phone
+                };
+                delete schedule.trainer.user;
+            }
 
             res.status(201).json({
                 success: true,
@@ -820,13 +899,31 @@ class Controler{
                     trainer: {
                         select: {
                             id: true,
-                            fullName: true,
-                            email: true
+                            specialization: true,
+                            bio: true,
+                            hireDate: true,
+                            user: {
+                                select: {
+                                    fullName: true,
+                                    email: true,
+                                    phone: true
+                                }
+                            }
                         }
                     },
                     hall: true
                 }
             });
+
+            if (updatedSchedule?.trainer?.user) {
+                updatedSchedule.trainer = {
+                    ...updatedSchedule.trainer,
+                    fullName: updatedSchedule.trainer.user.fullName,
+                    email: updatedSchedule.trainer.user.email,
+                    phone: updatedSchedule.trainer.user.phone
+                };
+                delete updatedSchedule.trainer.user;
+            }
             
             res.json({
                 success: true,
@@ -921,10 +1018,16 @@ class Controler{
                     trainer: {
                         select: {
                             id: true,
-                            fullName: true,
-                            email: true,
-                            phone: true,
-                            trainerInfo: true
+                            specialization: true,
+                            bio: true,
+                            hireDate: true,
+                            user: {
+                                select: {
+                                    fullName: true,
+                                    email: true,
+                                    phone: true
+                                }
+                            }
                         }
                     },
                     hall: true,
@@ -941,7 +1044,17 @@ class Controler{
             let formattedSchedule = schedule.map(item => ({
                 id: item.id,
                 danceStyle: item.danceStyle,
-                trainer: item.trainer,
+                trainer: item.trainer?.user
+                    ? {
+                        id: item.trainer.id,
+                        fullName: item.trainer.user.fullName,
+                        email: item.trainer.user.email,
+                        phone: item.trainer.user.phone,
+                        specialization: item.trainer.specialization,
+                        bio: item.trainer.bio,
+                        hireDate: item.trainer.hireDate
+                    }
+                    : item.trainer,
                 hall: item.hall,
                 date: item.date.toISOString().split('T')[0],
                 startTime: item.startTime.toISOString().split('T')[1].slice(0, 5),
@@ -975,10 +1088,16 @@ class Controler{
                     trainer: {
                         select: {
                             id: true,
-                            fullName: true,
-                            email: true,
-                            phone: true,
-                            trainerInfo: true
+                            specialization: true,
+                            bio: true,
+                            hireDate: true,
+                            user: {
+                                select: {
+                                    fullName: true,
+                                    email: true,
+                                    phone: true
+                                }
+                            }
                         }
                     },
                     hall: true,
@@ -1009,6 +1128,16 @@ class Controler{
                 return res.status(404).json({
                     error: 'Занятие в расписании не найдено'
                 });
+            }
+
+            if (schedule?.trainer?.user) {
+                schedule.trainer = {
+                    ...schedule.trainer,
+                    fullName: schedule.trainer.user.fullName,
+                    email: schedule.trainer.user.email,
+                    phone: schedule.trainer.user.phone
+                };
+                delete schedule.trainer.user;
             }
 
             res.json({schedule});
@@ -1072,7 +1201,8 @@ class Controler{
                         orderBy: {bookingTime: 'desc'}
                     }
                 },
-                orderBy: {createdAt: 'desc'}
+                // В модели Membership нет createdAt, сортируем по дате покупки.
+                orderBy: {purchaseDate: 'desc'}
             });
 
             let formattedMemberships = memberships.map(membership => ({
@@ -1100,7 +1230,10 @@ class Controler{
         }
         catch(error){
             console.error('getMemberships error:', error);
-            res.status(500).json({error: 'Ошибка при получении абонементов'});
+            res.status(500).json({
+                error: 'Ошибка при получении абонементов',
+                details: error.message
+            });
         }
     }
 
@@ -1582,6 +1715,12 @@ class Controler{
                 isActive
             } = req.body;
 
+            // Prisma Decimal удобнее передавать строкой.
+            let priceValue = price;
+            if (priceValue !== undefined && typeof priceValue === 'number') {
+                priceValue = priceValue.toString();
+            }
+
             if(!name || price === undefined){
                 return res.status(400).json({
                     error: 'Название и цена обязательны'
@@ -1626,7 +1765,7 @@ class Controler{
                 data: {
                     name,
                     description: description || null,
-                    price,
+                    price: priceValue,
                     visitCount: visitCount !== undefined ? visitCount : null,
                     durationDays: durationDays || null,
                     isActive: isActive !== undefined ? isActive : true
@@ -1648,6 +1787,10 @@ class Controler{
     async updateMembershipType(req, res){
         try{
             let { id } = req.params;
+            let membershipTypeId = parseInt(id);
+            if (Number.isNaN(membershipTypeId)) {
+                return res.status(400).json({ error: 'Некорректный id типа абонемента' });
+            }
             let {
                 name,
                 description,
@@ -1657,8 +1800,13 @@ class Controler{
                 isActive
             } = req.body;
 
+            let priceValue = price;
+            if (priceValue !== undefined && typeof priceValue === 'number') {
+                priceValue = priceValue.toString();
+            }
+
             let existingType = await prisma.membershipType.findUnique({
-                where: {id}
+                where: {id: membershipTypeId}
             });
 
             if(!existingType){
@@ -1706,13 +1854,13 @@ class Controler{
             let membershipTypeUpdateData = {};
             if(name !== undefined) membershipTypeUpdateData.name = name;
             if(description !== undefined) membershipTypeUpdateData.description = description;
-            if(price !== undefined) membershipTypeUpdateData.price = price;
+            if(price !== undefined) membershipTypeUpdateData.price = priceValue;
             if(visitCount !== undefined) membershipTypeUpdateData.visitCount = visitCount;
             if(durationDays !== undefined) membershipTypeUpdateData.durationDays = durationDays;
             if(isActive !== undefined) membershipTypeUpdateData.isActive = isActive;
 
             let updateMembershipType = await prisma.membershipType.update({
-                where: {id},
+                where: {id: membershipTypeId},
                 data: membershipTypeUpdateData
             });
 
@@ -1724,16 +1872,20 @@ class Controler{
         }
         catch(error){
             console.error('updateMembershipType error:', error);
-            res.status(500).json({error: 'Ошибка при изменении типа абонемента'});
+            res.status(500).json({error: 'Ошибка при изменении типа абонемента', details: error.message});
         }
     }
 
     async deleteMembershipType(req, res){
         try{
             let {id} = req.params;
+            let membershipTypeId = parseInt(id);
+            if (Number.isNaN(membershipTypeId)) {
+                return res.status(400).json({ error: 'Некорректный id типа абонемента' });
+            }
 
             let existingType = await prisma.membershipType.findUnique({
-                where: {id},
+                where: {id: membershipTypeId},
                 include: {
                     memberships: {
                         where: {
@@ -1754,7 +1906,7 @@ class Controler{
             }
 
             let deletedMembershipType = await prisma.membershipType.delete({
-                where: {id}
+                where: {id: membershipTypeId}
             });
 
             res.json({
@@ -1765,7 +1917,7 @@ class Controler{
         }
         catch(error){
             console.error('deleteMembershipType error:', error);
-            res.status(500).json({error: 'Ошибка при удалении типа абонемента'});
+            res.status(500).json({error: 'Ошибка при удалении типа абонемента', details: error.message});
         }
     }
 
@@ -1836,9 +1988,16 @@ class Controler{
                             trainer: {
                                 select: {
                                     id: true,
-                                    fullName: true,
-                                    email: true,
-                                    phone: true
+                                    specialization: true,
+                                    bio: true,
+                                    hireDate: true,
+                                    user: {
+                                        select: {
+                                            fullName: true,
+                                            email: true,
+                                            phone: true
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1871,20 +2030,30 @@ class Controler{
                     startTime: booking.schedule.startTime,
                     endTime: booking.schedule.endTime,
                     danceStyle: booking.schedule.danceStyle,
-                    trainer: booking.schedule.trainer,
+                    trainer: booking.schedule.trainer?.user
+                        ? {
+                            id: booking.schedule.trainer.id,
+                            fullName: booking.schedule.trainer.user.fullName,
+                            email: booking.schedule.trainer.user.email,
+                            phone: booking.schedule.trainer.user.phone,
+                            specialization: booking.schedule.trainer.specialization,
+                            bio: booking.schedule.trainer.bio,
+                            hireDate: booking.schedule.trainer.hireDate
+                        }
+                        : booking.schedule.trainer,
                     hall: booking.schedule.hall
                 },
                 client: booking.client,
                 membership: {
                     id: booking.membership.id,
-                    type: booking.membership.type,
+                    type: booking.membership.membershipType?.name,
                     remainingVisits: booking.membership.remainingVisits
                 },
                 status: booking.status,
                 bookingTime: booking.bookingTime,
                 attendedAt: booking.attendedAt,
                 cancelledAt: booking.cancelledAt,
-                isAttended: !!booking.attendanceLog
+                isAttended: Array.isArray(booking.attendanceLogs) && booking.attendanceLogs.length > 0
             }));
 
             res.json({
@@ -1895,7 +2064,7 @@ class Controler{
         }
         catch(error){
             console.error('getBookings error:', error);
-            res.status(500).json({error: 'Ошибка при получении записей на занятие'});
+            res.status(500).json({error: 'Ошибка при получении записей на занятие', details: error.message});
         }
     }
 
@@ -1912,9 +2081,16 @@ class Controler{
                     trainer: {
                         select: {
                             id: true,
-                            fullName: true,
-                            email: true,
-                            phone: true
+                            specialization: true,
+                            bio: true,
+                            hireDate: true,
+                            user: {
+                                select: {
+                                    fullName: true,
+                                    email: true,
+                                    phone: true
+                                }
+                            }
                         }
                     }
                 }
@@ -1936,6 +2112,16 @@ class Controler{
                 return res.status(403).json({
                     error: 'Вы можете просматривать записи только на свои занятия'
                 });
+            }
+
+            if (schedule?.trainer?.user) {
+                schedule.trainer = {
+                    ...schedule.trainer,
+                    fullName: schedule.trainer.user.fullName,
+                    email: schedule.trainer.user.email,
+                    phone: schedule.trainer.user.phone
+                };
+                delete schedule.trainer.user;
             }
 
             let bookings = await prisma.booking.findMany({
@@ -1962,11 +2148,12 @@ class Controler{
                             }
                         }
                     },
-                    attendanceLog: {
+                    attendanceLogs: {
+                        take: 1,
+                        orderBy: { markedAt: 'desc' },
                         select: {
                             id: true,
-                            markedAt: true,
-                            notes: true
+                            markedAt: true
                         }
                     }
                 },
@@ -1992,9 +2179,8 @@ class Controler{
                     remainingVisits: booking.membership.remainingVisits,
                     isUnlimited: booking.membership.membershipType.visitCount === null
                 },
-                attendanceLog: booking.attendanceLog ? {
-                    markedAt: booking.attendanceLog.markedAt,
-                    notes: booking.attendanceLog.notes
+                attendanceLog: booking.attendanceLogs?.[0] ? {
+                    markedAt: booking.attendanceLogs[0].markedAt,
                 } : null
             }));
 
@@ -2019,7 +2205,7 @@ class Controler{
         }
         catch(error){
             console.error('getBookingsBySchedule error:', error);
-            res.status(500).json({error: 'Ошибка при получении записей на занятие'});
+            res.status(500).json({error: 'Ошибка при получении записей на занятие', details: error.message});
         }
     }
 
@@ -2048,7 +2234,16 @@ class Controler{
                     trainer: {
                         select: {
                             id: true,
-                            fullName: true
+                            specialization: true,
+                            bio: true,
+                            hireDate: true,
+                            user: {
+                                select: {
+                                    fullName: true,
+                                    email: true,
+                                    phone: true
+                                }
+                            }
                         }
                     }
                 }
@@ -2179,7 +2374,16 @@ class Controler{
                             trainer: {
                                 select: {
                                     id: true,
-                                    fullName: true
+                                    specialization: true,
+                                    bio: true,
+                                    hireDate: true,
+                                    user: {
+                                        select: {
+                                            fullName: true,
+                                            email: true,
+                                            phone: true
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -2217,7 +2421,7 @@ class Controler{
                         startTime: booking.schedule.startTime,
                         endTime: booking.schedule.endTime,
                         danceStyle: booking.schedule.danceStyle.name,
-                        trainer: booking.schedule.trainer.fullName,
+                        trainer: booking.schedule.trainer?.user?.fullName,
                         hall: booking.schedule.hall.name
                     },
                     status: booking.status,
@@ -2335,9 +2539,7 @@ class Controler{
                 data:{
                     bookingId: id,
                     status: 'cancelled',
-                    changedBy: userId,
-                    changedAt: new Date(),
-                    reason: reason || (isOwner ? 'Отменено клиентом' : 'Отменено администратором/тренером')
+                    // В схеме BookingHistory нет changedBy/changedAt/reason
                 }
             });
 
@@ -2353,7 +2555,7 @@ class Controler{
         }
         catch(error){
             console.error('cancelBooking error:', error);
-            res.status(500).json({error: 'Ошибка при отмене занятия'});
+            res.status(500).json({error: 'Ошибка при отмене занятия', details: error.message});
         }
     }
 
@@ -2464,8 +2666,7 @@ class Controler{
                 data: {
                     bookingId: id,
                     trainerId: userId,
-                    markedAt: new Date(),
-                    notes: notes || null
+                    markedAt: new Date()
                 }
             });
 
@@ -2473,9 +2674,7 @@ class Controler{
                 data: {
                     bookingId: id,
                     status: newStatus,
-                    changedBy: userId,
-                    changedAt: new Date(),
-                    reason: notes || (attended ? 'Клиент присутствовал' : 'Клиент не пришел')
+                    // В схеме BookingHistory нет changedBy/changedAt/reason
                 }
             });
 
@@ -2489,14 +2688,13 @@ class Controler{
                 },
                 attendanceLog: {
                     id: attendanceLog.id,
-                    markedAt: attendanceLog.markedAt,
-                    notes: attendanceLog.notes
+                    markedAt: attendanceLog.markedAt
                 }
             });
         }
         catch(error){
             console.error('markAttendance error:', error);
-            res.status(500).json({error: 'Ошибка при отметке посещения'});
+            res.status(500).json({error: 'Ошибка при отметке посещения', details: error.message});
         }
     }
 
@@ -2541,9 +2739,16 @@ class Controler{
                             trainer: {
                                 select: {
                                     id: true,
-                                    fullName: true,
-                                    email: true,
-                                    phone: true
+                                    specialization: true,
+                                    bio: true,
+                                    hireDate: true,
+                                    user: {
+                                        select: {
+                                            fullName: true,
+                                            email: true,
+                                            phone: true
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -2565,7 +2770,6 @@ class Controler{
                         select: {
                             id: true,
                             markedAt: true,
-                            notes: true,
                             trainer: {
                                 select: {
                                     id: true,
@@ -2599,7 +2803,7 @@ class Controler{
                     startTime: booking.schedule.startTime,
                     endTime: booking.schedule.endTime,
                     danceStyle: booking.schedule.danceStyle.name,
-                    trainer: booking.schedule.trainer.fullName,
+                    trainer: booking.schedule.trainer?.user?.fullName,
                     hall: booking.schedule.hall.name
                 },
                 client: role !== 'client' ? {
@@ -2615,7 +2819,6 @@ class Controler{
                 attendanceLog: booking.attendanceLog ? {
                     markedAt: booking.attendanceLog.markedAt,
                     markedBy: booking.attendanceLog.trainer.fullName,
-                    notes: booking.attendanceLog.notes
                 } : null,
                 historyStatus: booking.history?.status  // из таблицы bookinghistory
             }));
@@ -2672,41 +2875,65 @@ class Controler{
                 if (toDate) dateFilter.date.lte = new Date(toDate);
             }
 
-            let popularClasses = await prisma.schedule.groupBy({
-                by: ['danceStyleId'],
+            // Prisma groupBy не умеет считать _count по relation (bookings) так, как это было написано.
+            // Берём занятия и агрегируем в JS.
+            let schedules = await prisma.schedule.findMany({
                 where: {
                     ...dateFilter,
                     status: 'completed'
                 },
-                _count: {bookings: true},
-                _avg: {
-                    currentBookings: true,
-                    maxCapacity: true
+                include: {
+                    danceStyle: {
+                        select: {
+                            id: true,
+                            name: true,
+                            description: true
+                        }
+                    },
+                    _count: {
+                        select: { bookings: true }
+                    }
                 }
             });
 
-            let danceStyles = await prisma.danceStyle.findMany({
-                where: {id: {in: popularClasses.map(p => p.danceStyleId)}},
-                select: {
-                    id: true,
-                    name: true,
-                    description: true
-                }
-            });
+            let byStyle = new Map();
+            for (let s of schedules) {
+                let key = s.danceStyleId;
+                let prev = byStyle.get(key) || {
+                    danceStyleId: key,
+                    danceStyleName: s.danceStyle?.name || 'Неизвестно',
+                    description: s.danceStyle?.description,
+                    totalBookings: 0,
+                    totalOccupancy: 0,
+                    totalMaxCapacity: 0,
+                    schedulesCount: 0
+                };
 
-            let formattedResults = popularClasses
+                prev.totalBookings += s._count?.bookings || 0;
+                prev.totalOccupancy += s.currentBookings || 0;
+                prev.totalMaxCapacity += s.maxCapacity || 0;
+                prev.schedulesCount += 1;
+                byStyle.set(key, prev);
+            }
+
+            let formattedResults = Array.from(byStyle.values())
                 .map(item => {
-                    let danceStyle = danceStyles.find(ds => ds.id === item.danceStyleId);
-                    let occupancyRate = item._avg.maxCapacity 
-                        ? Math.round((item._avg.currentBookings / item._avg.maxCapacity) * 100)
+                    let averageOccupancy = item.schedulesCount > 0
+                        ? Math.round(item.totalOccupancy / item.schedulesCount)
+                        : 0;
+                    let avgMaxCapacity = item.schedulesCount > 0
+                        ? Math.round(item.totalMaxCapacity / item.schedulesCount)
+                        : 0;
+                    let occupancyRate = avgMaxCapacity > 0
+                        ? Math.round((averageOccupancy / avgMaxCapacity) * 100)
                         : 0;
                     return {
                         danceStyleId: item.danceStyleId,
-                        danceStyleName: danceStyle?.name || 'Неизвестно',
-                        description: danceStyle?.description,
-                        totalBookings: item._count.bookings,
-                        averageOccupancy: Math.round(item._avg.currentBookings || 0),
-                        maxCapacity: Math.round(item._avg.maxCapacity || 0),
+                        danceStyleName: item.danceStyleName,
+                        description: item.description,
+                        totalBookings: item.totalBookings,
+                        averageOccupancy,
+                        maxCapacity: avgMaxCapacity,
                         occupancyRate
                     };
                 })
@@ -2747,7 +2974,7 @@ class Controler{
         }
         catch(error){
             console.error('getPopularClasses error:', error);
-            res.status(500).json({error: 'Ошибка при получении статистики популярных занятий'});
+            res.status(500).json({error: 'Ошибка при получении статистики популярных занятий', details: error.message});
         }
     }
 
@@ -2769,10 +2996,17 @@ class Controler{
                 if (toDate) dateFilter.date.lte = new Date(toDate);
             }
 
-            let trainers = await prisma.user.findMany({
-                where: {role: 'trainer'},
+            // schedulesAsTrainer находится на модели Trainer, а не User
+            let trainers = await prisma.trainer.findMany({
                 include: {
-                    trainerInfo: true,
+                    user: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            email: true,
+                            phone: true
+                        }
+                    },
                     schedulesAsTrainer: {
                         where: {
                             ...dateFilter,
@@ -2790,7 +3024,7 @@ class Controler{
             });
 
             let trainersStats = trainers.map(trainer => {
-                let schedules = trainer.schedulesAsTrainer;
+                let schedules = trainer.schedulesAsTrainer || [];
                 let totalClasses = schedules.length;
                 let totalBookings = schedules.reduce((sum, s) => sum + s.bookings.length, 0);
                 let attendedBookings = schedules.reduce((sum, s) => 
@@ -2808,12 +3042,13 @@ class Controler{
                 
                 return {
                     id: trainer.id,
-                    fullName: trainer.fullName,
-                    email: trainer.email,
-                    phone: trainer.phone,
-                    specialization: trainer.trainerInfo?.specialization || 'Не указана',
-                    bio: trainer.trainerInfo?.bio,
-                    hireDate: trainer.trainerInfo?.hireDate,
+                    userId: trainer.user?.id || null,
+                    fullName: trainer.user?.fullName,
+                    email: trainer.user?.email,
+                    phone: trainer.user?.phone,
+                    specialization: trainer.specialization || 'Не указана',
+                    bio: trainer.bio,
+                    hireDate: trainer.hireDate,
                     statistics: {
                         totalClasses,
                         totalBookings,
@@ -2860,7 +3095,7 @@ class Controler{
         }
         catch(error){
             console.error('getTrainersStats error:', error);
-            res.status(500).json({error: 'Ошибка при получении статистики тренеров'});
+            res.status(500).json({error: 'Ошибка при получении статистики тренеров', details: error.message});
         }
     }
 
@@ -2927,43 +3162,41 @@ class Controler{
                 };
             });
 
-            //Динамика продаж по периодам
-            let groupByFormat;
-            let dateField;
+            // Динамика продаж по периодам (без сырого SQL, чтобы не зависеть от имен колонок в БД).
+            let memberships = await prisma.membership.findMany({
+                where: dateFilter,
+                select: {
+                    purchaseDate: true,
+                    pricePaid: true
+                }
+            });
 
-            switch (period) {
-                case 'day':
-                    groupByFormat = '%Y-%m-%d';
-                    dateField = 'purchaseDate';
-                    break;
-                case 'week':
-                    groupByFormat = '%Y-%u';  // год-неделя
-                    dateField = 'purchaseDate';
-                    break;
-                case 'month':
-                    groupByFormat = '%Y-%m';
-                    dateField = 'purchaseDate';
-                    break;
-                case 'year':
-                    groupByFormat = '%Y';
-                    dateField = 'purchaseDate';
-                    break;
-                default:
-                    groupByFormat = '%Y-%m';
-                    dateField = 'purchaseDate';
+            let formatPeriod = (d) => {
+                let dt = new Date(d);
+                if (period === 'day') return dt.toISOString().slice(0, 10);
+                if (period === 'year') return dt.getUTCFullYear().toString();
+                if (period === 'week') {
+                    // ISO week (упрощенно): год-неделя на основе четверга
+                    let date = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
+                    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+                    let yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+                    let weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+                    return `${date.getUTCFullYear()}-${String(weekNo).padStart(2, '0')}`;
+                }
+                // month default
+                return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}`;
+            };
+
+            let dynMap = new Map();
+            for (let m of memberships) {
+                if (!m.purchaseDate) continue;
+                let key = formatPeriod(m.purchaseDate);
+                let prev = dynMap.get(key) || { period: key, count: 0, revenue: 0 };
+                prev.count += 1;
+                prev.revenue += Number(m.pricePaid || 0);
+                dynMap.set(key, prev);
             }
-
-            let salesDynamics = await prisma.$queryRaw`
-                SELECT 
-                    TO_CHAR(${dateField}, ${groupByFormat}) as period,
-                    COUNT(*) as count,
-                    SUM(price_paid) as revenue
-                FROM memberships
-                WHERE ${dateFilter.purchaseDate?.gte ? `purchase_date >= ${dateFilter.purchaseDate.gte}` : '1=1'}
-                AND ${dateFilter.purchaseDate?.lte ? `purchase_date <= ${dateFilter.purchaseDate.lte}` : '1=1'}
-                GROUP BY period
-                ORDER BY period ASC
-            `;
+            let salesDynamics = Array.from(dynMap.values()).sort((a, b) => a.period.localeCompare(b.period));
 
             //Активные абонементы
             let activeMemberships = await prisma.membership.count({
@@ -3025,7 +3258,7 @@ class Controler{
         }
         catch(error){
             console.error('getFinancialStats error:', error);
-            res.status(500).json({error: 'Ошибка при получении финансовой статистики'});
+            res.status(500).json({error: 'Ошибка при получении финансовой статистики', details: error.message});
         }
     }
 
