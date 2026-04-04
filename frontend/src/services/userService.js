@@ -4,7 +4,8 @@ export const userService = {
   // Получить всех пользователей (только админ)
   getUsers: async () => {
     const response = await api.get('/users');
-    return response.data.users;
+    // Бэкенд возвращает { users: [...] }
+    return response.data.users || [];
   },
 
   // Получить пользователя по ID
@@ -28,7 +29,8 @@ export const userService = {
   // Получить всех тренеров
   getTrainers: async () => {
     const response = await api.get('/trainers');
-    return response.data.trainers;
+    // Бэкенд возвращает { trainers: [...] }
+    return response.data.trainers || [];
   },
 
   // Создать тренера

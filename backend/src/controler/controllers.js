@@ -185,7 +185,7 @@ class Controler{
                     createdAt: true
                 },
                 // В модели Membership нет createdAt, сортируем по времени покупки.
-                orderBy: {purchaseDate: 'desc'}
+                orderBy: {createdAt: 'desc'}
             });
 
             res.json({users});
@@ -290,7 +290,7 @@ class Controler{
                     trainerInfo: true
                 },
                 // В модели Membership нет createdAt, сортируем по дате покупки.
-                orderBy: {purchaseDate: 'desc'}
+                orderBy: {createdAt: 'desc'}
             });
 
             let trainersWithoutPassword = trainers.map(trainer => {
@@ -491,6 +491,10 @@ class Controler{
     async createSchedule(req, res){
         try{
             let {danceStyleId, trainerId, hallId, date, startTime, endTime, maxCapacity, currentBookings, status, cancellationReason} = req.body;
+
+            if (danceStyleId) danceStyleId = parseInt(danceStyleId);
+            if (hallId) hallId = parseInt(hallId);
+            if (maxCapacity) maxCapacity = parseInt(maxCapacity);
 
             if(!req.user || !req.user.id){
                 return res.status(401).json({
@@ -730,6 +734,11 @@ class Controler{
                 cancellationReason
             } = req.body;
             
+            if (hallId) hallId = parseInt(hallId);
+            if (danceStyleId) danceStyleId = parseInt(danceStyleId);
+            if (maxCapacity) maxCapacity = parseInt(maxCapacity);
+            if (currentBookings !== undefined) currentBookings = parseInt(currentBookings);
+
             let existingSchedule = await prisma.schedule.findUnique({
                 where: { id }
             });
@@ -946,7 +955,7 @@ class Controler{
                 include: {
                     bookings: {
                         where: {
-                            status: {not: 'cancelled'}
+                            status: 'booked'
                         }
                     }
                 }
@@ -3340,6 +3349,10 @@ class Controler{
         try{
             let {id} = req.params;
             let {name, capacity, description, isActive} = req.body;
+            let hallId = parseInt(id);
+            if (isNaN(hallId)) {
+                return res.status(400).json({ error: 'Некорректный ID зала' });
+            }
 
             let existingHall = await prisma.hall.findUnique({
                 where: {id: parseInt(id)},
@@ -3408,6 +3421,10 @@ class Controler{
     async deleteHall(req, res){
         try{
             let {id} = req.params;
+            let hallId = parseInt(id);
+            if (isNaN(hallId)) {
+                return res.status(400).json({ error: 'Некорректный ID зала' });
+            }
 
             let existingHall = await prisma.hall.findUnique({
                 where: {

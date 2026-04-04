@@ -55,13 +55,16 @@ const MembershipTypesManager = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Вы уверены, что хотите удалить тип абонемента?')) {
-      try {
+    if (window.confirm('Вы уверены, что хотите удалить тип абонемента? Удаление возможно только если нет активных абонементов этого типа.')) {
+        try {
         await membershipService.deleteMembershipType(id);
-        fetchTypes();
-      } catch (error) {
-        alert('Ошибка при удалении');
-      }
+        await fetchTypes();
+        alert('Тип абонемента удален');
+        } catch (error) {
+        const errorMsg = error.response?.data?.error || 'Ошибка при удалении';
+        alert(errorMsg);
+        console.error('Ошибка удаления:', error);
+        }
     }
   };
 

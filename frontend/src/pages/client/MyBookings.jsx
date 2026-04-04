@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import api from '../../services/api';
+import { bookingService } from '../../services/bookingService';
+import { formatDate, formatTime } from '../../utils/dateHelpers';
 
 const MyBookings = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchBookings();
@@ -11,10 +13,13 @@ const MyBookings = () => {
 
   const fetchBookings = async () => {
     try {
-      const response = await api.get('/bookings');
-      setBookings(response.data.bookings);
+      setError(null);
+      const response = await bookingService.getBookings();
+      console.log('Загружены записи:', response);
+      setBookings(response.bookings || []);
     } catch (error) {
       console.error('Ошибка загрузки записей:', error);
+      setError(error.response?.data?.error || 'Ошибка загрузки записей');
     } finally {
       setLoading(false);
     }
@@ -23,16 +28,18 @@ const MyBookings = () => {
   const handleCancel = async (bookingId) => {
     if (window.confirm('Вы уверены, что хотите отменить запись?')) {
       try {
-        await api.put(`/bookings/${bookingId}/cancel`);
-        fetchBookings();
-        alert('Запись отменена');
+        await bookingService.cancelBooking(bookingId, 'Отменено клиентом');
+        alert('Запись успешно отменена');
+        fetchBookings(); // Обновляем список
       } catch (error) {
-        alert(error.response?.data?.error || 'Ошибка при отмене');
+        console.error('Ошибка отмены:', error);
+        alert(error.response?.data?.error || 'Ошибка при отмене записи');
       }
     }
   };
 
   if (loading) return <div className="loading">Загрузка...</div>;
+  if (error) return <div className="error" style={{ textAlign: 'center', padding: '50px' }}>{error}</div>;
 
   return (
     <div className="container">
@@ -42,10 +49,10 @@ const MyBookings = () => {
       ) : (
         bookings.map((booking) => (
           <div key={booking.id} className="card">
-            <h3>{booking.schedule.danceStyle.name}</h3>
-            <p><strong>Тренер:</strong> {booking.schedule.trainer.fullName}</p>
-            <p><strong>Дата:</strong> {booking.schedule.date}</p>
-            <p><strong>Время:</strong> {booking.schedule.startTime} - {booking.schedule.endTime}</p>
+            <h3>{booking.schedule?.danceStyle?.name || 'Занятие'}</h3>
+            <p><strong>Тренер:</strong> {booking.schedule?.trainer?.fullName || '—'}</p>
+            <p><strong>Дата:</strong> {formatDate(booking.schedule?.date)}</p>
+            <p><strong>Время:</strong> {booking.schedule?.startTime} - {booking.schedule?.endTime}</p>
             <p><strong>Статус:</strong> {
               booking.status === 'booked' ? 'Забронировано' :
               booking.status === 'attended' ? 'Посещено' :

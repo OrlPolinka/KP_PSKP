@@ -4,7 +4,8 @@ export const scheduleService = {
   // Получить расписание
   getSchedule: async (params = {}) => {
     const response = await api.get('/schedule', { params });
-    return response.data.schedule;
+    // Бэкенд возвращает { schedule: [...] }
+    return response.data.schedule || [];
   },
 
   // Получить занятие по ID
@@ -34,12 +35,12 @@ export const scheduleService = {
   // Получить залы
   getHalls: async () => {
     const response = await api.get('/halls');
-    return response.data.halls;
+    return response.data.halls || [];
   },
 
   // Получить стили танцев
   getDanceStyles: async () => {
     const response = await api.get('/dance-styles');
-    return response.data.danceStyles;
+    return response.data.danceStyles || [];
   },
 };
