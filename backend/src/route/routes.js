@@ -1,8 +1,43 @@
 const express = require('express');
 const Controller = require('../controler/controllers');
 const {authMiddleware, roleMiddleware} = require('../middleware/auth');
+const passport = require('../middleware/googleAuth');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 let controler = new Controller();
+
+// Google OAuth routes (special handling)
+router.get('/api/auth/google', (req, res, next) => {
+    const hasGoogleCreds = process.env.GOOGLE_CLIENT_ID &&
+        process.env.GOOGLE_CLIENT_ID !== 'your_google_client_id_here';
+    if (!hasGoogleCreds) {
+        return res.redirect('http://localhost:3000/login?error=google_not_configured');
+    }
+    passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+});
+
+router.get('/api/auth/google/callback',
+    passport.authenticate('google', { session: false, failureRedirect: 'http://localhost:3000/login?error=google_failed' }),
+    (req, res) => {
+        try {
+            const user = req.user;
+            const token = jwt.sign(
+                { id: user.id, email: user.email, role: user.role },
+                process.env.JWT_SECRET,
+                { expiresIn: '7d' }
+            );
+            const { password: _, ...userWithoutPassword } = user;
+            // Redirect to frontend with token
+            const params = new URLSearchParams({
+                token,
+                user: JSON.stringify(userWithoutPassword)
+            });
+            res.redirect(`http://localhost:3000/auth/google/success?${params.toString()}`);
+        } catch (error) {
+            res.redirect('http://localhost:3000/login?error=google_failed');
+        }
+    }
+);
 
 const routes = [
     //авторизация/регистрация
@@ -14,6 +49,7 @@ const routes = [
     {method: 'get',                path: '/users',                                 action: 'getUsers'},
     {method: 'get',                path: '/users/:id',                             action: 'getUserById'},
     {method: 'put',                path: '/users/:id/block',                       action: 'blockUser'},
+    {method: 'put',                path: '/users/:id/profile',                     action: 'updateUserProfile'},
     {method: 'delete',             path: '/users/:id',                             action: 'deleteUser'},
 
     //тренеры(админ)
@@ -23,6 +59,7 @@ const routes = [
     {method: 'delete',             path: '/trainers/:id',                          action: 'deleteTrainer'},
 
     //расписание
+    {method: 'post',               path: '/schedule/complete-passed',              action: 'completePassedSchedules'},
     {method: 'post',               path: '/schedule',                              action: 'createSchedule'},
     {method: 'put',                path: '/schedule/:id',                          action: 'updateSchedule'},
     {method: 'delete',             path: '/schedule/:id',                          action: 'deleteSchedule'},

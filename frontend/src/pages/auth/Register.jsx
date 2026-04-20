@@ -6,10 +6,12 @@ const Register = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     fullName: '',
     phone: '',
     role: 'client',
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
@@ -22,10 +24,20 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
 
+    if (formData.password !== formData.confirmPassword) {
+      setError('Пароли не совпадают');
+      return;
+    }
+    if (formData.password.length < 6) {
+      setError('Пароль должен содержать минимум 6 символов');
+      return;
+    }
+
+    setLoading(true);
     try {
-      await register(formData);
+      const { confirmPassword, ...submitData } = formData;
+      await register(submitData);
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.error || 'Ошибка при регистрации');
@@ -35,31 +47,65 @@ const Register = () => {
   };
 
   return (
-    <div className="container">
-      <div className="card" style={{ maxWidth: '500px', margin: '50px auto' }}>
-        <h2>Регистрация</h2>
-        {error && <div className="error">{error}</div>}
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #0F0F1A 0%, #1A0A2E 50%, #0F0F1A 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        position: 'absolute', top: '-20%', left: '-10%',
+        width: '500px', height: '500px',
+        background: 'radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%)',
+        borderRadius: '50%', pointerEvents: 'none',
+      }} />
+      <div style={{
+        position: 'absolute', bottom: '-20%', right: '-10%',
+        width: '400px', height: '400px',
+        background: 'radial-gradient(circle, rgba(236,72,153,0.08) 0%, transparent 70%)',
+        borderRadius: '50%', pointerEvents: 'none',
+      }} />
+
+      <div style={{
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '24px',
+        padding: '48px 40px',
+        width: '100%',
+        maxWidth: '480px',
+        backdropFilter: 'blur(20px)',
+        boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+        position: 'relative',
+        zIndex: 1,
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>💃</div>
+          <h1 style={{
+            fontFamily: 'Playfair Display, serif',
+            fontSize: '28px', fontWeight: '700',
+            background: 'linear-gradient(135deg, #A78BFA, #EC4899)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            marginBottom: '6px',
+          }}>
+            Создать аккаунт
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>
+            Присоединяйся к DanceStudio
+          </p>
+        </div>
+
+        {error && (
+          <div className="alert alert-error" style={{ marginBottom: '20px' }}>
+            ⚠️ {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Email</label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label>Пароль</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-            />
-          </div>
           <div className="form-group">
             <label>ФИО</label>
             <input
@@ -67,9 +113,23 @@ const Register = () => {
               name="fullName"
               value={formData.fullName}
               onChange={handleChange}
+              placeholder="Иванова Анна Сергеевна"
               required
             />
           </div>
+
+          <div className="form-group">
+            <label>Email</label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="your@email.com"
+              required
+            />
+          </div>
+
           <div className="form-group">
             <label>Телефон</label>
             <input
@@ -77,22 +137,142 @@ const Register = () => {
               name="phone"
               value={formData.phone}
               onChange={handleChange}
+              placeholder="+7 (999) 123-45-67"
             />
           </div>
+
           <div className="form-group">
-            <label>Роль</label>
-            <select name="role" value={formData.role} onChange={handleChange}>
-              <option value="client">Клиент</option>
-              <option value="trainer">Тренер</option>
-              <option value="admin">Администратор</option>
-            </select>
+            <label>Пароль</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Минимум 6 символов"
+                required
+                style={{ paddingRight: '48px' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute', right: '12px', top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'rgba(255,255,255,0.4)', fontSize: '16px', padding: '4px',
+                }}
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
           </div>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Регистрация...' : 'Зарегистрироваться'}
+
+          <div className="form-group">
+            <label>Подтвердите пароль</label>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              name="confirmPassword"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              placeholder="Повторите пароль"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Я регистрируюсь как</label>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {[
+                { value: 'client', label: '🎓 Ученик', desc: 'Хочу учиться' },
+              ].map(opt => (
+                <label key={opt.value} style={{
+                  flex: 1,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  padding: '14px 10px',
+                  background: formData.role === opt.value
+                    ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${formData.role === opt.value ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  textAlign: 'center',
+                }}>
+                  <input
+                    type="radio"
+                    name="role"
+                    value={opt.value}
+                    checked={formData.role === opt.value}
+                    onChange={handleChange}
+                    style={{ display: 'none' }}
+                  />
+                  <span style={{ fontSize: '20px', marginBottom: '4px' }}>{opt.label.split(' ')[0]}</span>
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: formData.role === opt.value ? '#A78BFA' : 'rgba(255,255,255,0.6)' }}>
+                    {opt.label.split(' ').slice(1).join(' ')}
+                  </span>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>{opt.desc}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={loading}
+            style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: '15px', marginTop: '8px' }}
+          >
+            {loading ? (
+              <>
+                <span className="spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
+                Регистрация...
+              </>
+            ) : 'Создать аккаунт'}
           </button>
         </form>
-        <p style={{ marginTop: '15px', textAlign: 'center' }}>
-          Уже есть аккаунт? <Link to="/login">Войти</Link>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '12px',
+          margin: '24px 0',
+        }}>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>или</span>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => window.location.href = 'http://localhost:5000/api/auth/google'}
+          style={{
+            width: '100%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+            padding: '12px',
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: '10px',
+            color: 'rgba(255,255,255,0.8)',
+            fontSize: '14px', fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            fontFamily: 'Inter, sans-serif',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          Зарегистрироваться через Google
+        </button>
+
+        <p style={{ textAlign: 'center', marginTop: '24px', color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>
+          Уже есть аккаунт?{' '}
+          <Link to="/login" style={{ color: '#A78BFA', textDecoration: 'none', fontWeight: '500' }}>
+            Войти
+          </Link>
         </p>
       </div>
     </div>

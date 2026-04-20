@@ -10,10 +10,21 @@ export const formatDate = (dateString) => {
 
 export const formatTime = (timeString) => {
   if (!timeString) return '—';
-  if (timeString.includes('T')) {
-    return timeString.split('T')[1].slice(0, 5);
+  const str = String(timeString);
+  // ISO datetime string: "1970-01-01T15:00:00.000Z" — extract UTC hours:minutes
+  if (str.includes('T')) {
+    // Parse as Date and get UTC hours/minutes to avoid timezone shift
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      const h = String(d.getUTCHours()).padStart(2, '0');
+      const m = String(d.getUTCMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+    // Fallback: just slice after T
+    return str.split('T')[1].slice(0, 5);
   }
-  return timeString.slice(0, 5);
+  // Already "HH:mm" or "HH:mm:ss"
+  return str.slice(0, 5);
 };
 
 export const formatDateTime = (dateString, timeString) => {

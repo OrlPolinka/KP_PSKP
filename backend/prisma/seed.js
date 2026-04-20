@@ -196,7 +196,42 @@ async function main() {
         { danceStyleName: 'Bachata', trainerEmail: 'mikhail.sokolov@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: 5, startTime: '18:00:00', endTime: '19:30:00', maxCapacity: 20 },
         { danceStyleName: 'Stretching', trainerEmail: 'elena.morozova@dancestudio.ru', hallName: 'Зал для растяжки и йоги', daysOffset: 6, startTime: '11:00:00', endTime: '12:00:00', maxCapacity: 12 },
         { danceStyleName: 'K-Pop Dance', trainerEmail: 'dmitry.kozlov@dancestudio.ru', hallName: 'Хип-хоп студия', daysOffset: 6, startTime: '15:00:00', endTime: '16:30:00', maxCapacity: 15 },
-        { danceStyleName: 'Salsa', trainerEmail: 'mikhail.sokolov@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: 6, startTime: '18:00:00', endTime: '19:30:00', maxCapacity: 20 }
+        { danceStyleName: 'Salsa', trainerEmail: 'mikhail.sokolov@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: 6, startTime: '18:00:00', endTime: '19:30:00', maxCapacity: 20 },
+
+        // ===== ПРОШЕДШИЕ ЗАНЯТИЯ (daysOffset -7 .. -1) =====
+        { danceStyleName: 'Zumba', trainerEmail: 'anna.zubareva@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: -7, startTime: '10:00:00', endTime: '11:00:00', maxCapacity: 20, status: 'scheduled' },
+        { danceStyleName: 'Hip-Hop', trainerEmail: 'dmitry.kozlov@dancestudio.ru', hallName: 'Хип-хоп студия', daysOffset: -7, startTime: '18:00:00', endTime: '19:30:00', maxCapacity: 18, status: 'scheduled' },
+        { danceStyleName: 'Stretching', trainerEmail: 'elena.morozova@dancestudio.ru', hallName: 'Зал для растяжки и йоги', daysOffset: -6, startTime: '12:00:00', endTime: '13:00:00', maxCapacity: 12, status: 'scheduled' },
+        { danceStyleName: 'Salsa', trainerEmail: 'mikhail.sokolov@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: -6, startTime: '19:00:00', endTime: '20:30:00', maxCapacity: 20, status: 'scheduled' },
+        { danceStyleName: 'Contemporary', trainerEmail: 'elena.morozova@dancestudio.ru', hallName: 'Балетный класс', daysOffset: -5, startTime: '18:30:00', endTime: '20:00:00', maxCapacity: 15, status: 'scheduled' },
+        { danceStyleName: 'Twerk', trainerEmail: 'anna.zubareva@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: -5, startTime: '20:30:00', endTime: '21:30:00', maxCapacity: 15, status: 'scheduled' },
+        { danceStyleName: 'K-Pop Dance', trainerEmail: 'dmitry.kozlov@dancestudio.ru', hallName: 'Хип-хоп студия', daysOffset: -4, startTime: '18:00:00', endTime: '19:30:00', maxCapacity: 15, status: 'scheduled' },
+        { danceStyleName: 'Bachata', trainerEmail: 'mikhail.sokolov@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: -4, startTime: '20:00:00', endTime: '21:30:00', maxCapacity: 20, status: 'scheduled' },
+        { danceStyleName: 'Ballet Body', trainerEmail: 'elena.morozova@dancestudio.ru', hallName: 'Балетный класс', daysOffset: -3, startTime: '10:00:00', endTime: '11:00:00', maxCapacity: 12, status: 'scheduled' },
+        { danceStyleName: 'Pole Dance (на пилоне)', trainerEmail: 'olga.volkova@dancestudio.ru', hallName: 'Малый зал (индивидуальный)', daysOffset: -3, startTime: '20:00:00', endTime: '21:00:00', maxCapacity: 6, status: 'scheduled' },
+        { danceStyleName: 'Hip-Hop', trainerEmail: 'ivan.petrov@dancestudio.ru', hallName: 'Хип-хоп студия', daysOffset: -2, startTime: '19:00:00', endTime: '20:30:00', maxCapacity: 18, status: 'scheduled' },
+        { danceStyleName: 'Dancehall', trainerEmail: 'anna.zubareva@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: -2, startTime: '19:30:00', endTime: '21:00:00', maxCapacity: 18, status: 'scheduled' },
+        { danceStyleName: 'High Heels', trainerEmail: 'dmitry.kozlov@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: -1, startTime: '21:00:00', endTime: '22:00:00', maxCapacity: 12, status: 'scheduled' },
+        { danceStyleName: 'Zumba', trainerEmail: 'anna.zubareva@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: -1, startTime: '18:00:00', endTime: '19:00:00', maxCapacity: 20, status: 'scheduled' },
+        { danceStyleName: 'Stretching', trainerEmail: 'olga.volkova@dancestudio.ru', hallName: 'Зал для растяжки и йоги', daysOffset: -1, startTime: '20:00:00', endTime: '21:00:00', maxCapacity: 12, status: 'scheduled' },
+
+        // ===== БУДУЩИЕ ЗАНЯТИЯ (daysOffset 7 .. 14) =====
+        { danceStyleName: 'Zumba', trainerEmail: 'anna.zubareva@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: 7, startTime: '10:00:00', endTime: '11:00:00', maxCapacity: 20 },
+        { danceStyleName: 'Hip-Hop', trainerEmail: 'dmitry.kozlov@dancestudio.ru', hallName: 'Хип-хоп студия', daysOffset: 7, startTime: '18:00:00', endTime: '19:30:00', maxCapacity: 18 },
+        { danceStyleName: 'Salsa', trainerEmail: 'mikhail.sokolov@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: 8, startTime: '19:00:00', endTime: '20:30:00', maxCapacity: 20 },
+        { danceStyleName: 'Contemporary', trainerEmail: 'elena.morozova@dancestudio.ru', hallName: 'Балетный класс', daysOffset: 8, startTime: '18:30:00', endTime: '20:00:00', maxCapacity: 15 },
+        { danceStyleName: 'Twerk', trainerEmail: 'ivan.petrov@dancestudio.ru', hallName: 'Хип-хоп студия', daysOffset: 9, startTime: '20:00:00', endTime: '21:30:00', maxCapacity: 15 },
+        { danceStyleName: 'Ballet Body', trainerEmail: 'elena.morozova@dancestudio.ru', hallName: 'Балетный класс', daysOffset: 9, startTime: '10:00:00', endTime: '11:00:00', maxCapacity: 12 },
+        { danceStyleName: 'K-Pop Dance', trainerEmail: 'dmitry.kozlov@dancestudio.ru', hallName: 'Хип-хоп студия', daysOffset: 10, startTime: '18:00:00', endTime: '19:30:00', maxCapacity: 15 },
+        { danceStyleName: 'Bachata', trainerEmail: 'mikhail.sokolov@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: 10, startTime: '20:00:00', endTime: '21:30:00', maxCapacity: 20 },
+        { danceStyleName: 'Pole Dance (на пилоне)', trainerEmail: 'olga.volkova@dancestudio.ru', hallName: 'Малый зал (индивидуальный)', daysOffset: 11, startTime: '20:00:00', endTime: '21:00:00', maxCapacity: 6 },
+        { danceStyleName: 'Dancehall', trainerEmail: 'anna.zubareva@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: 11, startTime: '19:30:00', endTime: '21:00:00', maxCapacity: 18 },
+        { danceStyleName: 'Stretching', trainerEmail: 'elena.morozova@dancestudio.ru', hallName: 'Зал для растяжки и йоги', daysOffset: 12, startTime: '12:00:00', endTime: '13:00:00', maxCapacity: 12 },
+        { danceStyleName: 'High Heels', trainerEmail: 'dmitry.kozlov@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: 12, startTime: '21:00:00', endTime: '22:00:00', maxCapacity: 12 },
+        { danceStyleName: 'Zumba', trainerEmail: 'anna.zubareva@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: 13, startTime: '11:00:00', endTime: '12:00:00', maxCapacity: 25 },
+        { danceStyleName: 'Salsa', trainerEmail: 'mikhail.sokolov@dancestudio.ru', hallName: 'Большой танцевальный зал', daysOffset: 13, startTime: '18:00:00', endTime: '19:30:00', maxCapacity: 20 },
+        { danceStyleName: 'Hip-Hop', trainerEmail: 'ivan.petrov@dancestudio.ru', hallName: 'Хип-хоп студия', daysOffset: 14, startTime: '19:00:00', endTime: '20:30:00', maxCapacity: 18 },
+        { danceStyleName: 'Contemporary', trainerEmail: 'elena.morozova@dancestudio.ru', hallName: 'Балетный класс', daysOffset: 14, startTime: '19:00:00', endTime: '20:30:00', maxCapacity: 15 }
     ];
 
     const getTrainerId = async (email) => {
@@ -237,7 +272,7 @@ async function main() {
                 endTime,
                 maxCapacity: s.maxCapacity,
                 currentBookings: 0,
-                status: 'scheduled',
+                status: s.status || 'scheduled',
                 createdByUser: { connect: { id: adminUser.id } }
             }
         });
@@ -253,8 +288,10 @@ async function main() {
 
     const now = new Date();
     const membershipsData = [
-        // Мария Иванова
+        // Мария Иванова — несколько абонементов для тестирования
         { clientId: clientMaria.id, membershipTypeId: membershipTypeMap['Абонемент на 8 занятий'], purchaseDate: new Date(now), startDate: new Date(now), endDate: new Date(now.getTime() + 45*24*60*60*1000), remainingVisits: 8, status: 'active', pricePaid: 3600 },
+        { clientId: clientMaria.id, membershipTypeId: membershipTypeMap['Разовое занятие'], purchaseDate: new Date(now.getTime() - 60*24*60*60*1000), startDate: new Date(now.getTime() - 60*24*60*60*1000), endDate: null, remainingVisits: 0, status: 'expired', pricePaid: 600 },
+        { clientId: clientMaria.id, membershipTypeId: membershipTypeMap['Пробная неделя'], purchaseDate: new Date(now.getTime() - 30*24*60*60*1000), startDate: new Date(now.getTime() - 30*24*60*60*1000), endDate: new Date(now.getTime() - 23*24*60*60*1000), remainingVisits: null, status: 'expired', pricePaid: 1500 },
         // Екатерина Сидорова
         { clientId: clientEkaterina.id, membershipTypeId: membershipTypeMap['Безлимитный на месяц'], purchaseDate: new Date(now), startDate: new Date(now), endDate: new Date(now.getTime() + 30*24*60*60*1000), remainingVisits: null, status: 'active', pricePaid: 4500 },
         // Ольга Кузнецова

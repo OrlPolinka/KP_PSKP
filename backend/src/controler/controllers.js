@@ -161,7 +161,12 @@ class Controler{
                 return res.status(404).json({error: 'Пользователь не найден'});
             }
 
+            // Get photoUrl via raw query (in case Prisma client cache is stale)
+            const rawUser = await prisma.$queryRaw`SELECT photourl FROM users WHERE id = ${userId}::uuid`;
+            const photoUrl = rawUser?.[0]?.photourl || null;
+
             let {password: _, ...userWithoutPassword} = user;
+            userWithoutPassword.photoUrl = photoUrl;
 
             res.json({user: userWithoutPassword});
         }   
@@ -182,7 +187,8 @@ class Controler{
                     phone: true,
                     role: true,
                     isActive: true,
-                    createdAt: true
+                    createdAt: true,
+                    photoUrl: true
                 },
                 // В модели Membership нет createdAt, сортируем по времени покупки.
                 orderBy: {createdAt: 'desc'}
@@ -1441,9 +1447,11 @@ class Controler{
             let {role, id: userId} = req.user;
             let {status, pauseReason} = req.body;
 
-            if(role !== 'admin'){
+            // Клиент может только приостанавливать/возобновлять свой абонемент
+            // Администратор может менять любой статус любого абонемента
+            if(role !== 'admin' && role !== 'client'){
                 return res.status(403).json({
-                    error: 'Доступ запрещен. Активировать/деактивировать абонементы может только администратор'
+                    error: 'Доступ запрещен'
                 });
             }
 
@@ -1467,6 +1475,22 @@ class Controler{
                 });
             }
 
+            // Клиент может менять только свой абонемент и только paused/active
+            if(role === 'client'){
+                if(existingMembership.clientId !== userId){
+                    return res.status(403).json({ error: 'Нет доступа к этому абонементу' });
+                }
+                if(!['paused', 'active'].includes(status)){
+                    return res.status(403).json({ error: 'Клиент может только приостанавливать или возобновлять абонемент' });
+                }
+                if(status === 'paused' && existingMembership.status !== 'active'){
+                    return res.status(400).json({ error: 'Приостановить можно только активный абонемент' });
+                }
+                if(status === 'active' && existingMembership.status !== 'paused'){
+                    return res.status(400).json({ error: 'Возобновить можно только приостановленный абонемент' });
+                }
+            }
+
             let validStatuses = ['active', 'paused', 'expired', 'cancelled'];
             if(!validStatuses.includes(status)){
                 return res.status(400).json({
@@ -1474,22 +1498,10 @@ class Controler{
                 });
             }
 
-            if(status === 'paused' && existingMembership.status !== 'active'){
-                return res.status(400).json({
-                    error: 'Приостановить можно только активный абонемент'
-                });
-            }
-
-            if(status === 'active' && existingMembership.status !== 'paused'){
-                return res.status(400).json({
-                    error: 'Активировать можно только приостановленный абонемент'
-                });
-            }
-
-            if(status === 'cancelled' && ['expired', 'cancelled'].includes(existingMembership.status)){
-                return res.status(400).json({
-                    error: 'Абонемент уже завершен или отменен'
-                });
+            // Администратор может устанавливать любой статус без ограничений
+            // (кроме повторной отмены уже отменённого)
+            if(role === 'admin' && status === 'cancelled' && existingMembership.status === 'cancelled'){
+                return res.status(400).json({ error: 'Абонемент уже отменён' });
             }
 
             let updateData = {status};
@@ -1686,6 +1698,10 @@ class Controler{
     //типы абонементов
     async getMembershipTypes(req, res){
         try{
+            let {role} = req.user;
+            // Администратор видит все типы, клиенты/тренеры — только активные
+            let where = role === 'admin' ? {} : { isActive: true };
+
             let membershipTypes = await prisma.membershipType.findMany({
                 select: {
                     id: true,
@@ -1696,7 +1712,7 @@ class Controler{
                     durationDays: true,
                     isActive: true
                 },
-                where: {isActive: true},
+                where,
                 orderBy: {
                     price: 'asc'
                 }
@@ -3593,6 +3609,87 @@ class Controler{
         }
     }
 
+    // Обновление профиля пользователя (самим пользователем или администратором)
+    async updateUserProfile(req, res) {
+        try {
+            let { id } = req.params;
+            let { fullName, phone, photoUrl } = req.body;
+
+            // Проверяем что пользователь обновляет свой профиль или это администратор
+            if (req.user.id !== id && req.user.role !== 'admin') {
+                return res.status(403).json({ error: 'Нет прав для изменения этого профиля' });
+            }
+
+            let existingUser = await prisma.user.findUnique({ where: { id } });
+            if (!existingUser) {
+                return res.status(404).json({ error: 'Пользователь не найден' });
+            }
+
+            // Build update via raw SQL to handle photoUrl (Text column) regardless of client cache
+            const setClauses = [];
+            const values = [];
+            let idx = 1;
+
+            if (fullName !== undefined) {
+                setClauses.push(`fullname = $${idx++}`);
+                values.push(fullName);
+            }
+            if (phone !== undefined) {
+                setClauses.push(`phone = $${idx++}`);
+                values.push(phone || null);
+            }
+            if (photoUrl !== undefined) {
+                setClauses.push(`photourl = $${idx++}`);
+                values.push(photoUrl || null);
+            }
+
+            if (setClauses.length === 0) {
+                return res.json({ success: true, message: 'Нет данных для обновления', user: existingUser });
+            }
+
+            values.push(id);
+            await prisma.$executeRawUnsafe(
+                `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${idx}::uuid`,
+                ...values
+            );
+
+            let user = await prisma.user.findUnique({ where: { id } });
+            let { password: _, ...userWithoutPassword } = user;
+
+            res.json({
+                success: true,
+                message: 'Профиль обновлён',
+                user: userWithoutPassword
+            });
+        } catch (error) {
+            console.error('updateUserProfile error:', error);
+            res.status(500).json({ error: 'Ошибка при обновлении профиля', details: error.message });
+        }
+    }
+
+    // Авто-завершение прошедших занятий (статус scheduled → completed)
+    async completePassedSchedules(req, res) {
+        try {
+            const now = new Date();
+            // Находим все занятия со статусом scheduled, дата которых уже прошла
+            const result = await prisma.schedule.updateMany({
+                where: {
+                    status: 'scheduled',
+                    date: { lt: new Date(now.toISOString().split('T')[0]) }
+                },
+                data: { status: 'completed' }
+            });
+
+            res.json({
+                success: true,
+                message: `Завершено занятий: ${result.count}`,
+                count: result.count
+            });
+        } catch (error) {
+            console.error('completePassedSchedules error:', error);
+            res.status(500).json({ error: 'Ошибка при обновлении статусов занятий' });
+        }
+    }
 
 }
 
