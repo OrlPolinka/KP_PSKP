@@ -9,7 +9,6 @@ import RoleRoute from './components/common/RoleRoute';
 import Home from './pages/Home';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
-import GoogleCallback from './pages/auth/GoogleCallback';
 import Profile from './pages/Profile';
 
 // Client Pages
@@ -54,7 +53,6 @@ const AppRoutes = () => {
         <Route path="/home" element={<Home />} />
         <Route path="/login" element={user ? <Navigate to={getDefaultRoute()} /> : <Login />} />
         <Route path="/register" element={user ? <Navigate to={getDefaultRoute()} /> : <Register />} />
-        <Route path="/auth/google/success" element={<GoogleCallback />} />
 
         {/* Protected Routes */}
         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />

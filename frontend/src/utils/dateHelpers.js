@@ -56,6 +56,26 @@ export const isPastDate = (dateString) => {
   return date < today;
 };
 
+// Проверяет прошло ли занятие с учётом времени начала
+// date — строка даты "YYYY-MM-DD", startTime — "HH:mm" или ISO
+export const isPastDateTime = (dateString, startTime) => {
+  if (!dateString) return false;
+  const dateStr = String(dateString).split('T')[0]; // "YYYY-MM-DD"
+  let timeStr = '00:00';
+  if (startTime) {
+    const t = String(startTime);
+    if (t.includes('T')) {
+      // ISO: "1970-01-01T15:00:00.000Z" — берём UTC часы
+      const d = new Date(t);
+      timeStr = `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
+    } else {
+      timeStr = t.slice(0, 5); // "HH:mm"
+    }
+  }
+  const classDateTime = new Date(`${dateStr}T${timeStr}:00`);
+  return classDateTime < new Date();
+};
+
 export const isToday = (dateString) => {
   const date = new Date(dateString);
   const today = new Date();

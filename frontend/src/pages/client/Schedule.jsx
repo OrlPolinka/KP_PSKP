@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { formatDate, formatTime, isPastDate, isToday } from '../../utils/dateHelpers';
+import { formatDate, formatTime, isPastDate, isPastDateTime, isToday } from '../../utils/dateHelpers';
 
 const statusConfig = {
   scheduled: { label: 'Открыта запись', badge: 'badge-success', icon: '✅' },
@@ -18,6 +18,7 @@ const ScheduleDetailModal = ({ item, onClose, onBook, booking }) => {
   const occupancy = item.maxCapacity > 0
     ? Math.round((item.currentBookings / item.maxCapacity) * 100)
     : 0;
+  const pastNow = isPastDateTime(item.date, item.startTime);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -88,7 +89,7 @@ const ScheduleDetailModal = ({ item, onClose, onBook, booking }) => {
 
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose}>Закрыть</button>
-          {item.status === 'scheduled' && freeSlots > 0 && !isPastDate(item.date) && (
+          {item.status === 'scheduled' && freeSlots > 0 && !pastNow && (
             <button
               className="btn btn-primary"
               onClick={() => onBook(item.id)}
@@ -160,10 +161,12 @@ const Schedule = () => {
         item.hall?.name?.toLowerCase().includes(search.toLowerCase());
       const matchStyle = !selectedStyle || item.danceStyle?.id === parseInt(selectedStyle);
       const freeSlots = item.maxCapacity - item.currentBookings;
-      const past = isPastDate(item.date);
-      if (filterStatus === 'available') return matchSearch && matchStyle && item.status === 'scheduled' && freeSlots > 0 && !past;
-      if (filterStatus === 'today') return matchSearch && matchStyle && isToday(item.date);
-      if (filterStatus === 'upcoming') return matchSearch && matchStyle && !past;
+      // Проверяем по дате И времени начала — занятие скрывается как только наступило его время
+      const pastNow = isPastDateTime(item.date, item.startTime);
+      const pastDay = isPastDate(item.date);
+      if (filterStatus === 'available') return matchSearch && matchStyle && item.status === 'scheduled' && freeSlots > 0 && !pastNow;
+      if (filterStatus === 'today') return matchSearch && matchStyle && isToday(item.date) && !pastNow;
+      if (filterStatus === 'upcoming') return matchSearch && matchStyle && !pastNow;
       return matchSearch && matchStyle;
     })
     .sort((a, b) => {
@@ -312,7 +315,7 @@ const ScheduleCard = ({ item, onClick, onBook }) => {
   const occupancy = item.maxCapacity > 0
     ? Math.round((item.currentBookings / item.maxCapacity) * 100)
     : 0;
-  const past = isPastDate(item.date);
+  const pastNow = isPastDateTime(item.date, item.startTime);
   const today = isToday(item.date);
 
   return (
@@ -325,7 +328,7 @@ const ScheduleCard = ({ item, onClick, onBook }) => {
         padding: '20px',
         cursor: 'pointer',
         transition: 'all 0.25s ease',
-        opacity: past && item.status !== 'scheduled' ? 0.6 : 1,
+        opacity: pastNow && item.status !== 'scheduled' ? 0.6 : 1,
         position: 'relative',
         overflow: 'hidden',
       }}
@@ -395,7 +398,7 @@ const ScheduleCard = ({ item, onClick, onBook }) => {
         </div>
       </div>
 
-      {onBook && item.status === 'scheduled' && freeSlots > 0 && !past && (
+      {onBook && item.status === 'scheduled' && freeSlots > 0 && !pastNow && (
         <button
           className="btn btn-primary"
           style={{ width: '100%', justifyContent: 'center' }}
