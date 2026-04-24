@@ -16,7 +16,12 @@ const PORT = process.env.PORT || 5000;
 
 // CORS
 const corsOptions = {
-    origin: ['http://localhost:3000', 'http://localhost:5000', 'https://192.168.99.100', 'http://192.168.99.100'],
+    origin: function(origin, callback) {
+        // Разрешаем запросы без origin (мобильные, Postman) и любые https/http
+        if (!origin) return callback(null, true);
+        // В Docker все запросы идут через nginx, origin будет тот же хост
+        return callback(null, true);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -35,8 +40,8 @@ app.get('/api/health', (req, res) => {
 // Socket.io
 const io = new Server(server, {
     cors: {
-        origin: ['http://localhost:3000', 'http://localhost:5000', 'https://192.168.99.100', 'http://192.168.99.100'],
-        credentials: true,
+        origin: '*',
+        credentials: false,
         methods: ['GET', 'POST']
     },
     path: '/socket.io'
