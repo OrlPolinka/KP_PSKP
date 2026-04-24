@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { scheduleService } from '../../services/scheduleService';
 import { bookingService } from '../../services/bookingService';
 import { formatDate, formatTime, isToday, isPastDate } from '../../utils/dateHelpers';
+import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 
 const ClassAttendance = () => {
+  const navigate = useNavigate();
   const [schedule, setSchedule] = useState([]);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [bookings, setBookings] = useState([]);
@@ -323,7 +325,23 @@ const ClassAttendance = () => {
                               >
                                 ❌ Не пришёл
                               </button>
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => navigate(`/chat/${booking.client?.id}`)}
+                                style={{ color: '#A78BFA' }}
+                              >
+                                💬
+                              </button>
                             </div>
+                          )}
+                          {(booking.status === 'attended' || booking.status === 'no_show') && (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => navigate(`/chat/${booking.client?.id}`)}
+                              style={{ color: '#A78BFA' }}
+                            >
+                              💬 Написать
+                            </button>
                           )}
                         </td>
                       </tr>

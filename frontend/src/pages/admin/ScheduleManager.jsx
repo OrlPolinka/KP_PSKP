@@ -10,17 +10,32 @@ const statusConfig = {
   completed: { label: 'Завершено', badge: 'badge-success' },
 };
 
-// Проверяем совместимость тренера с направлением по специализации
+// Получаем массив специализаций тренера
+const getTrainerSpecializations = (trainer) => {
+  const spec = trainer.trainerInfo?.specialization;
+  if (!spec) return [];
+  return spec.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+};
+
+// Проверяем совместимость тренера с направлением
+// Тренер совместим если: у него нет специализации (берёт любое) ИЛИ его специализация включает это направление
 const isTrainerCompatible = (trainer, danceStyleName) => {
-  // If no style selected, all trainers are shown
   if (!danceStyleName) return true;
-  // If trainer has no specialization, they are NOT compatible (show in "other" group)
-  if (!trainer.trainerInfo?.specialization) return false;
-  const spec = trainer.trainerInfo.specialization.toLowerCase();
+  const specs = getTrainerSpecializations(trainer);
+  // Тренер без специализации — совместим с любым направлением
+  if (specs.length === 0) return true;
   const style = danceStyleName.toLowerCase();
-  return spec.includes(style) || style.includes(spec) ||
-    spec.split(/[,;\s]+/).some(s => s.trim().length > 2 && style.includes(s.trim())) ||
-    style.split(/[,;\s]+/).some(s => s.trim().length > 2 && spec.includes(s.trim()));
+  return specs.some(s => s === style || s.includes(style) || style.includes(s));
+};
+
+// Проверяем совместимость направления с тренером
+// Направление совместимо если: у тренера нет специализации ИЛИ его специализация включает это направление
+const isStyleCompatibleWithTrainer = (danceStyleName, trainer) => {
+  if (!trainer) return true;
+  const specs = getTrainerSpecializations(trainer);
+  if (specs.length === 0) return true; // тренер без специализации — берёт любое
+  const style = danceStyleName.toLowerCase();
+  return specs.some(s => s === style || s.includes(style) || style.includes(s));
 };
 
 const ScheduleManager = () => {
@@ -117,11 +132,27 @@ const ScheduleManager = () => {
 
   // Get selected dance style name for trainer filtering
   const selectedStyleName = danceStyles.find(s => String(s.id) === String(formData.danceStyleId))?.name || '';
+  // Get selected trainer for style filtering
+  const selectedTrainer = trainers.find(t => String(t.id) === String(formData.trainerId)) || null;
 
-  // Filter trainers: show compatible first, then incompatible (greyed out)
-  const compatibleTrainers = trainers.filter(t => t.isActive && isTrainerCompatible(t, selectedStyleName));
+  // Фильтрация тренеров:
+  // Если выбрано направление → показываем совместимых (с этой специализацией или без специализации) первыми
+  // Тренеры с другой специализацией — в отдельной группе
+  const activeTrainers = trainers.filter(t => t.isActive);
+  const compatibleTrainers = selectedStyleName
+    ? activeTrainers.filter(t => isTrainerCompatible(t, selectedStyleName))
+    : activeTrainers;
   const incompatibleTrainers = selectedStyleName
-    ? trainers.filter(t => t.isActive && !isTrainerCompatible(t, selectedStyleName))
+    ? activeTrainers.filter(t => !isTrainerCompatible(t, selectedStyleName))
+    : [];
+
+  // Фильтрация направлений:
+  // Если выбран тренер с специализацией → показываем только его направления первыми
+  const trainerSpecs = selectedTrainer ? getTrainerSpecializations(selectedTrainer) : [];
+  const hasTrainerSpecs = trainerSpecs.length > 0;
+  const compatibleStyles = danceStyles.filter(s => s.isActive && isStyleCompatibleWithTrainer(s.name, selectedTrainer));
+  const incompatibleStyles = (selectedTrainer && hasTrainerSpecs)
+    ? danceStyles.filter(s => s.isActive && !isStyleCompatibleWithTrainer(s.name, selectedTrainer))
     : [];
 
   // Filter schedule
@@ -279,52 +310,73 @@ const ScheduleManager = () => {
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label>Направление *</label>
                   <select required value={formData.danceStyleId}
-                    onChange={e => setFormData({ ...formData, danceStyleId: e.target.value, trainerId: '' })}>
+                    onChange={e => {
+                      const newStyleId = e.target.value;
+                      const newStyleName = danceStyles.find(s => String(s.id) === String(newStyleId))?.name || '';
+                      const trainerIncompatible = selectedTrainer &&
+                        getTrainerSpecializations(selectedTrainer).length > 0 &&
+                        !isTrainerCompatible(selectedTrainer, newStyleName);
+                      setFormData({ ...formData, danceStyleId: newStyleId, trainerId: trainerIncompatible ? '' : formData.trainerId });
+                    }}>
                     <option value="" style={{ background: '#1A1A2E' }}>Выберите направление</option>
-                    {danceStyles.filter(s => s.isActive).map(style => (
-                      <option key={style.id} value={style.id} style={{ background: '#1A1A2E' }}>{style.name}</option>
-                    ))}
+                    {!selectedTrainer || !hasTrainerSpecs ? (
+                      danceStyles.filter(s => s.isActive).map(style => (
+                        <option key={style.id} value={style.id} style={{ background: '#1A1A2E' }}>{style.name}</option>
+                      ))
+                    ) : (
+                      <>
+                        {compatibleStyles.map(style => (
+                          <option key={style.id} value={style.id} style={{ background: '#1A1A2E' }}>{style.name}</option>
+                        ))}
+                        {incompatibleStyles.length > 0 && (
+                          <>
+                            <option disabled style={{ background: '#1A1A2E', color: 'rgba(255,255,255,0.2)', fontSize: '11px' }}>── другая специализация ──</option>
+                            {incompatibleStyles.map(style => (
+                              <option key={style.id} value={style.id} style={{ background: '#1A1A2E', color: '#94A3B8' }}>{style.name}</option>
+                            ))}
+                          </>
+                        )}
+                      </>
+                    )}
                   </select>
                 </div>
 
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label>
-                    Тренер *
-                    {selectedStyleName && incompatibleTrainers.length > 0 && (
-                      <span style={{ marginLeft: '8px', fontSize: '11px', color: '#F59E0B', fontWeight: '400' }}>
-                        ⚠️ Тренеры без специализации «{selectedStyleName}» отмечены серым
-                      </span>
-                    )}
-                  </label>
+                  <label>Тренер *</label>
                   <select required value={formData.trainerId}
-                    onChange={e => setFormData({ ...formData, trainerId: e.target.value })}
+                    onChange={e => {
+                      const newTrainerId = e.target.value;
+                      const newTrainer = trainers.find(t => String(t.id) === String(newTrainerId)) || null;
+                      const styleIncompatible = newTrainer &&
+                        getTrainerSpecializations(newTrainer).length > 0 &&
+                        selectedStyleName &&
+                        !isStyleCompatibleWithTrainer(selectedStyleName, newTrainer);
+                      setFormData({ ...formData, trainerId: newTrainerId, danceStyleId: styleIncompatible ? '' : formData.danceStyleId });
+                    }}
                     style={{ background: '#1A1A2E' }}>
                     <option value="" style={{ background: '#1A1A2E' }}>Выберите тренера</option>
                     {!selectedStyleName ? (
-                      trainers.filter(t => t.isActive).map(t => (
+                      activeTrainers.map(t => (
                         <option key={t.id} value={t.id} style={{ background: '#1A1A2E', color: 'white' }}>
                           {t.fullName}{t.trainerInfo?.specialization ? ` — ${t.trainerInfo.specialization}` : ''}
                         </option>
                       ))
                     ) : (
                       <>
-                        {compatibleTrainers.length > 0 && (
-                          <optgroup label="✅ Подходящие тренеры">
-                            {compatibleTrainers.map(t => (
-                              <option key={t.id} value={t.id} style={{ background: '#1A1A2E', color: 'white' }}>
-                                {t.fullName} — {t.trainerInfo.specialization}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
+                        {compatibleTrainers.map(t => (
+                          <option key={t.id} value={t.id} style={{ background: '#1A1A2E', color: 'white' }}>
+                            {t.fullName}{t.trainerInfo?.specialization ? ` — ${t.trainerInfo.specialization}` : ''}
+                          </option>
+                        ))}
                         {incompatibleTrainers.length > 0 && (
-                          <optgroup label="⚠️ Другая специализация / без специализации">
+                          <>
+                            <option disabled style={{ background: '#1A1A2E', color: 'rgba(255,255,255,0.2)', fontSize: '11px' }}>── другая специализация ──</option>
                             {incompatibleTrainers.map(t => (
                               <option key={t.id} value={t.id} style={{ background: '#1A1A2E', color: '#94A3B8' }}>
-                                {t.fullName}{t.trainerInfo?.specialization ? ` — ${t.trainerInfo.specialization}` : ' — специализация не указана'}
+                                {t.fullName}{t.trainerInfo?.specialization ? ` — ${t.trainerInfo.specialization}` : ''}
                               </option>
                             ))}
-                          </optgroup>
+                          </>
                         )}
                       </>
                     )}

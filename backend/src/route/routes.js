@@ -111,7 +111,16 @@ const routes = [
     {method: 'get',                path: '/dance-styles',                          action: 'getDanceStyles'},
     {method: 'post',               path: '/dance-styles',                          action: 'createDanceStyle'},
     {method: 'put',                path: '/dance-styles/:id',                      action: 'updateDanceStyle'},
-    {method: 'delete',             path: '/dance-styles/:id',                      action: 'deleteDanceStyle'}
+    {method: 'delete',             path: '/dance-styles/:id',                      action: 'deleteDanceStyle'},
+
+    //чат
+    {method: 'get',                path: '/chat/contacts',                         action: 'getChatContacts'},
+    {method: 'get',                path: '/chat/search',                           action: 'searchChatUsers'},
+    {method: 'get',                path: '/chat/history/:userId',                  action: 'getChatHistory'},
+    {method: 'get',                path: '/chat/unread',                           action: 'getUnreadCount'},
+    {method: 'put',                path: '/chat/messages/:messageId',              action: 'editMessage'},
+    {method: 'delete',             path: '/chat/messages/:messageId',              action: 'deleteMessage'},
+    {method: 'delete',             path: '/chat/dialog/:userId',                   action: 'deleteDialog'},
     
 ];
 

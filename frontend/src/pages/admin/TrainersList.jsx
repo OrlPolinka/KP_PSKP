@@ -1,9 +1,64 @@
 import React, { useState, useEffect } from 'react';
 import { userService } from '../../services/userService';
 import UserProfileModal from '../../components/common/UserProfileModal';
+import api from '../../services/api';
+
+// Компонент мультиселекта специализаций
+const SpecializationSelect = ({ value, onChange, danceStyles }) => {
+  const selected = value ? value.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+  const toggle = (name) => {
+    const next = selected.includes(name)
+      ? selected.filter(s => s !== name)
+      : [...selected, name];
+    onChange(next.join(', '));
+  };
+
+  return (
+    <div>
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '8px',
+        padding: '10px', background: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px',
+        minHeight: '44px',
+      }}>
+        {danceStyles.length === 0 && (
+          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>Загрузка направлений...</span>
+        )}
+        {danceStyles.map(style => {
+          const isSelected = selected.includes(style.name);
+          return (
+            <button
+              key={style.id}
+              type="button"
+              onClick={() => toggle(style.name)}
+              style={{
+                padding: '4px 12px', borderRadius: '20px', fontSize: '12px',
+                fontWeight: '600', cursor: 'pointer', border: 'none',
+                background: isSelected
+                  ? 'linear-gradient(135deg, #8B5CF6, #EC4899)'
+                  : 'rgba(255,255,255,0.08)',
+                color: isSelected ? 'white' : 'rgba(255,255,255,0.5)',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {isSelected ? '✓ ' : ''}{style.name}
+            </button>
+          );
+        })}
+      </div>
+      {selected.length > 0 && (
+        <div style={{ marginTop: '6px', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+          Выбрано: {selected.join(', ')}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const TrainersList = () => {
   const [trainers, setTrainers] = useState([]);
+  const [danceStyles, setDanceStyles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editModal, setEditModal] = useState(null);
@@ -18,6 +73,7 @@ const TrainersList = () => {
 
   useEffect(() => {
     fetchTrainers();
+    fetchDanceStyles();
   }, []);
 
   const fetchTrainers = async () => {
@@ -28,6 +84,15 @@ const TrainersList = () => {
       console.error('Ошибка загрузки тренеров:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDanceStyles = async () => {
+    try {
+      const res = await api.get('/dance-styles');
+      setDanceStyles(res.data.danceStyles || []);
+    } catch (error) {
+      console.error('Ошибка загрузки направлений:', error);
     }
   };
 
@@ -320,10 +385,12 @@ const TrainersList = () => {
                     placeholder="+7 (999) 123-45-67" />
                 </div>
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label>Специализация</label>
-                  <input type="text" value={formData.specialization}
-                    onChange={e => setFormData({ ...formData, specialization: e.target.value })}
-                    placeholder="Сальса, Бачата, Хип-хоп..." />
+                  <label>Специализация <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: '400' }}>(выберите направления)</span></label>
+                  <SpecializationSelect
+                    value={formData.specialization}
+                    onChange={val => setFormData({ ...formData, specialization: val })}
+                    danceStyles={danceStyles}
+                  />
                 </div>
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label>Биография</label>
@@ -364,9 +431,12 @@ const TrainersList = () => {
                     onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, phone: e.target.value } })} />
                 </div>
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label>Специализация</label>
-                  <input type="text" value={editModal.data.specialization}
-                    onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, specialization: e.target.value } })} />
+                  <label>Специализация <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: '400' }}>(выберите направления)</span></label>
+                  <SpecializationSelect
+                    value={editModal.data.specialization}
+                    onChange={val => setEditModal({ ...editModal, data: { ...editModal.data, specialization: val } })}
+                    danceStyles={danceStyles}
+                  />
                 </div>
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label>Биография</label>

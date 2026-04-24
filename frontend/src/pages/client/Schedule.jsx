@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { formatDate, formatTime, isPastDate, isPastDateTime, isToday } from '../../utils/dateHelpers';
 
 const statusConfig = {
@@ -9,7 +10,7 @@ const statusConfig = {
   completed: { label: 'Завершено', badge: 'badge-info', icon: '🏁' },
 };
 
-const ScheduleDetailModal = ({ item, onClose, onBook, booking }) => {
+const ScheduleDetailModal = ({ item, onClose, onBook, booking, onChat }) => {
   if (!item) return null;
   const status = statusConfig[item.status] || statusConfig.scheduled;
   const startTime = formatTime(item.startTime);
@@ -89,6 +90,15 @@ const ScheduleDetailModal = ({ item, onClose, onBook, booking }) => {
 
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose}>Закрыть</button>
+          {item.trainer?.userId && onChat && (
+            <button
+              className="btn btn-ghost"
+              onClick={() => { onClose(); onChat(item.trainer.userId); }}
+              style={{ color: '#A78BFA', borderColor: 'rgba(167,139,250,0.3)' }}
+            >
+              💬 Написать тренеру
+            </button>
+          )}
           {item.status === 'scheduled' && freeSlots > 0 && !pastNow && (
             <button
               className="btn btn-primary"
@@ -106,6 +116,7 @@ const ScheduleDetailModal = ({ item, onClose, onBook, booking }) => {
 
 const Schedule = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -151,6 +162,10 @@ const Schedule = () => {
     } finally {
       setBooking(false);
     }
+  };
+
+  const handleChat = (trainerUserId) => {
+    navigate(`/chat/${trainerUserId}`);
   };
 
   const filtered = schedule
@@ -301,6 +316,7 @@ const Schedule = () => {
           onClose={() => setSelectedItem(null)}
           onBook={handleBook}
           booking={booking}
+          onChat={user?.role === 'client' ? handleChat : null}
         />
       )}
     </div>

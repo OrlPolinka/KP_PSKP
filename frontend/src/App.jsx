@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ChatProvider } from './context/ChatContext';
 import Navbar from './components/Layout/Navbar';
 import PrivateRoute from './components/common/PrivateRoute';
 import RoleRoute from './components/common/RoleRoute';
@@ -10,6 +11,7 @@ import Home from './pages/Home';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import Profile from './pages/Profile';
+import Chat from './pages/Chat';
 
 // Client Pages
 import Schedule from './pages/client/Schedule';
@@ -77,6 +79,10 @@ const AppRoutes = () => {
         <Route path="/admin/memberships" element={<RoleRoute allowedRoles={['admin']}><MembershipsManager /></RoleRoute>} />
         <Route path="/admin/analytics" element={<RoleRoute allowedRoles={['admin']}><Analytics /></RoleRoute>} />
 
+        {/* Chat */}
+        <Route path="/chat" element={<PrivateRoute><Chat /></PrivateRoute>} />
+        <Route path="/chat/:userId" element={<PrivateRoute><Chat /></PrivateRoute>} />
+
         {/* Fallback */}
         <Route path="*" element={<Navigate to={getDefaultRoute()} />} />
       </Routes>
@@ -87,7 +93,9 @@ const AppRoutes = () => {
 function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <ChatProvider>
+        <AppRoutes />
+      </ChatProvider>
     </AuthProvider>
   );
 }

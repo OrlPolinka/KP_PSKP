@@ -37,3 +37,21 @@ docker-compose down
 docker-machine stop default
 
 # 3. Закрыть терминал
+
+
+
+Запуск
+Обычный запуск (образы уже собраны):
+
+docker-compose up
+Запуск в фоне (терминал свободен):
+
+docker-compose up -d
+Запуск с пересборкой образов (после изменений в коде):
+
+docker-compose up --build
+Пересобрать только один сервис:
+
+docker-compose up --build --no-deps frontend
+docker-compose up --build --no-deps nginx
+docker-compose up --build --no-deps backend

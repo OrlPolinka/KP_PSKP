@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useChat } from '../../context/ChatContext';
 import './Navbar.css';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const { unreadTotal } = useChat();
   const navigate = useNavigate();
   const location = useLocation();
   const [avatarSrc, setAvatarSrc] = useState(null);
@@ -66,6 +68,19 @@ const Navbar = () => {
           <>
             <Link to="/trainer/schedule" className={isActive('/trainer/schedule') ? 'active' : ''}>Моё расписание</Link>
             <Link to="/trainer/classes" className={isActive('/trainer/classes') ? 'active' : ''}>Посещаемость</Link>
+            <Link to="/chat" className={isActive('/chat') ? 'active' : ''} style={{ position: 'relative' }}>
+              💬 Чат
+              {unreadTotal > 0 && (
+                <span style={{
+                  position: 'absolute', top: '-6px', right: '-10px',
+                  background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
+                  color: 'white', fontSize: '10px', fontWeight: '700',
+                  borderRadius: '10px', padding: '1px 5px', minWidth: '16px', textAlign: 'center',
+                }}>
+                  {unreadTotal > 99 ? '99+' : unreadTotal}
+                </span>
+              )}
+            </Link>
           </>
         );
       case 'client':
@@ -75,6 +90,19 @@ const Navbar = () => {
             <Link to="/my-bookings" className={isActive('/my-bookings') ? 'active' : ''}>Мои записи</Link>
             <Link to="/my-memberships" className={isActive('/my-memberships') ? 'active' : ''}>Абонементы</Link>
             <Link to="/history" className={isActive('/history') ? 'active' : ''}>История</Link>
+            <Link to="/chat" className={isActive('/chat') ? 'active' : ''} style={{ position: 'relative' }}>
+              💬 Чат
+              {unreadTotal > 0 && (
+                <span style={{
+                  position: 'absolute', top: '-6px', right: '-10px',
+                  background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
+                  color: 'white', fontSize: '10px', fontWeight: '700',
+                  borderRadius: '10px', padding: '1px 5px', minWidth: '16px', textAlign: 'center',
+                }}>
+                  {unreadTotal > 99 ? '99+' : unreadTotal}
+                </span>
+              )}
+            </Link>
           </>
         );
       default:

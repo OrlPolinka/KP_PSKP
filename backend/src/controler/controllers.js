@@ -165,7 +165,9 @@ class Controler{
             const rawUser = await prisma.$queryRaw`SELECT photourl FROM users WHERE id = ${userId}::uuid`;
             const photoUrl = rawUser?.[0]?.photourl || null;
 
-            let {password: _, ...userWithoutPassword} = user;
+            let {password: _, trainerInfo, ...userWithoutPassword} = user;
+            // Нормализуем trainerInfo: массив → объект
+            userWithoutPassword.trainerInfo = trainerInfo?.[0] || null;
             userWithoutPassword.photoUrl = photoUrl;
 
             res.json({user: userWithoutPassword});
@@ -220,7 +222,9 @@ class Controler{
                 return res.status(404).json({error: 'Пользователь не найден'});
             }
 
-            let {password: _, ...userWithoutPassword} = user;
+            let {password: _, trainerInfo, ...userWithoutPassword} = user;
+            // Нормализуем trainerInfo: массив → объект
+            userWithoutPassword.trainerInfo = trainerInfo?.[0] || null;
 
             res.json({user: userWithoutPassword});
         }
@@ -295,12 +299,13 @@ class Controler{
                 include: {
                     trainerInfo: true
                 },
-                // В модели Membership нет createdAt, сортируем по дате покупки.
                 orderBy: {createdAt: 'desc'}
             });
 
             let trainersWithoutPassword = trainers.map(trainer => {
-                let {password, ...trainerWithoutPassword} = trainer;
+                let {password, trainerInfo, ...trainerWithoutPassword} = trainer;
+                // Нормализуем trainerInfo: массив → объект (первый элемент)
+                trainerWithoutPassword.trainerInfo = trainerInfo?.[0] || null;
                 return trainerWithoutPassword;
             });
 
@@ -424,13 +429,19 @@ class Controler{
             });
 
             let trainerUpdateData = {};
-            if(specialization !== undefined) trainerUpdateData.specialization = specialization;
-            if(bio !== undefined) trainerUpdateData.bio = bio;
+            if(specialization !== undefined) trainerUpdateData.specialization = specialization || null;
+            if(bio !== undefined) trainerUpdateData.bio = bio || null;
 
             if(Object.keys(trainerUpdateData).length > 0){
-                await prisma.trainer.update({
+                // Используем upsert на случай если trainer-запись не существует
+                await prisma.trainer.upsert({
                     where: {id},
-                    data: trainerUpdateData
+                    update: trainerUpdateData,
+                    create: {
+                        id,
+                        userId: id,
+                        ...trainerUpdateData
+                    }
                 });
             }
 
@@ -441,7 +452,9 @@ class Controler{
                 }
             });
 
-            let {password: _, ...userWithoutPassword} = updatedTrainer;
+            let {password: _, trainerInfo, ...userWithoutPassword} = updatedTrainer;
+            // Нормализуем trainerInfo: массив → объект
+            userWithoutPassword.trainerInfo = trainerInfo?.[0] || null;
 
             res.json({
                 success: true,
@@ -1018,7 +1031,13 @@ class Controler{
             }
 
             if(role === 'trainer'){
-                where.trainerId = userId;
+                // trainerId в Schedule ссылается на Trainer.id, а не User.id
+                const trainerRecord = await prisma.trainer.findFirst({ where: { userId } });
+                if (trainerRecord) {
+                    where.trainerId = trainerRecord.id;
+                } else {
+                    where.trainerId = userId; // fallback
+                }
             }
 
             if(role === 'client'){
@@ -1033,6 +1052,7 @@ class Controler{
                     trainer: {
                         select: {
                             id: true,
+                            userId: true,
                             specialization: true,
                             bio: true,
                             hireDate: true,
@@ -1062,6 +1082,7 @@ class Controler{
                 trainer: item.trainer?.user
                     ? {
                         id: item.trainer.id,
+                        userId: item.trainer.userId,
                         fullName: item.trainer.user.fullName,
                         email: item.trainer.user.email,
                         phone: item.trainer.user.phone,
@@ -3688,6 +3709,310 @@ class Controler{
         } catch (error) {
             console.error('completePassedSchedules error:', error);
             res.status(500).json({ error: 'Ошибка при обновлении статусов занятий' });
+        }
+    }
+
+    // ─── ЧАТ ─────────────────────────────────────────────────────────────────
+
+    // Получить список контактов для чата
+    // Клиент видит тренеров у которых записан, тренер видит своих клиентов
+    async getChatContacts(req, res) {
+        try {
+            const { id: userId, role } = req.user;
+            let contacts = [];
+
+            if (role === 'client') {
+                // Клиент видит тренеров, у которых есть записи
+                const bookings = await prisma.booking.findMany({
+                    where: { clientId: userId, status: { not: 'cancelled' } },
+                    include: {
+                        schedule: {
+                            include: {
+                                trainer: {
+                                    include: {
+                                        user: { select: { id: true, fullName: true, photoUrl: true, role: true, isActive: true } }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                const trainerMap = new Map();
+                for (const b of bookings) {
+                    const trainerUser = b.schedule?.trainer?.user;
+                    if (trainerUser && !trainerMap.has(trainerUser.id)) {
+                        trainerMap.set(trainerUser.id, {
+                            id: trainerUser.id,
+                            fullName: trainerUser.fullName,
+                            photoUrl: trainerUser.photoUrl,
+                            role: trainerUser.role,
+                            isActive: trainerUser.isActive,
+                            specialization: b.schedule?.trainer?.specialization || null,
+                        });
+                    }
+                }
+                contacts = Array.from(trainerMap.values());
+
+            } else if (role === 'trainer') {
+                // Тренер видит клиентов, которые записаны на его занятия
+                const trainerRecord = await prisma.trainer.findFirst({ where: { userId } });
+                if (!trainerRecord) return res.json({ contacts: [] });
+
+                const bookings = await prisma.booking.findMany({
+                    where: {
+                        status: { not: 'cancelled' },
+                        schedule: { trainerId: trainerRecord.id }
+                    },
+                    include: {
+                        client: { select: { id: true, fullName: true, photoUrl: true, role: true, isActive: true } }
+                    }
+                });
+
+                const clientMap = new Map();
+                for (const b of bookings) {
+                    if (b.client && !clientMap.has(b.client.id)) {
+                        clientMap.set(b.client.id, b.client);
+                    }
+                }
+                contacts = Array.from(clientMap.values());
+
+            } else if (role === 'admin') {
+                // Админ видит всех пользователей
+                const users = await prisma.user.findMany({
+                    where: { id: { not: userId }, isActive: true },
+                    select: { id: true, fullName: true, photoUrl: true, role: true, isActive: true },
+                    orderBy: { fullName: 'asc' }
+                });
+                contacts = users;
+            }
+
+            // Для каждого контакта получаем последнее сообщение и кол-во непрочитанных
+            const contactsWithMeta = await Promise.all(contacts.map(async (contact) => {
+                const lastMsgResult = await prisma.$queryRaw`
+                    SELECT id, content, createdat, senderid, isread, edited
+                    FROM messages
+                    WHERE (senderid = ${userId}::uuid AND receiverid = ${contact.id}::uuid)
+                       OR (senderid = ${contact.id}::uuid AND receiverid = ${userId}::uuid)
+                    ORDER BY createdat DESC
+                    LIMIT 1
+                `;
+                const unreadResult = await prisma.$queryRaw`
+                    SELECT COUNT(*)::int as count
+                    FROM messages
+                    WHERE senderid = ${contact.id}::uuid
+                      AND receiverid = ${userId}::uuid
+                      AND isread = false
+                `;
+                return {
+                    ...contact,
+                    lastMessage: lastMsgResult[0] ? {
+                        id: Number(lastMsgResult[0].id),
+                        content: lastMsgResult[0].content,
+                        createdAt: lastMsgResult[0].createdat,
+                        senderId: lastMsgResult[0].senderid,
+                        isRead: lastMsgResult[0].isread,
+                    } : null,
+                    unreadCount: unreadResult[0]?.count || 0,
+                };
+            }));
+
+            // Сортируем: сначала с непрочитанными, потом по дате последнего сообщения
+            contactsWithMeta.sort((a, b) => {
+                if (b.unreadCount !== a.unreadCount) return b.unreadCount - a.unreadCount;
+                const aTime = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt) : new Date(0);
+                const bTime = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt) : new Date(0);
+                return bTime - aTime;
+            });
+
+            res.json({ success: true, contacts: contactsWithMeta });
+        } catch (error) {
+            console.error('getChatContacts error:', error);
+            res.status(500).json({ error: 'Ошибка при получении контактов' });
+        }
+    }
+
+    // История сообщений с конкретным пользователем
+    async getChatHistory(req, res) {
+        try {
+            const { id: userId } = req.user;
+            const { userId: otherUserId } = req.params;
+            const { limit = 50, before } = req.query;
+
+            let whereClause = `
+                WHERE (senderid = '${userId}'::uuid AND receiverid = '${otherUserId}'::uuid)
+                   OR (senderid = '${otherUserId}'::uuid AND receiverid = '${userId}'::uuid)
+            `;
+            if (before) {
+                whereClause += ` AND id < ${parseInt(before)}`;
+            }
+
+            const messages = await prisma.$queryRawUnsafe(`
+                SELECT m.id, m.senderid, m.receiverid, m.content, m.isread, m.edited, m.createdat,
+                       u.fullname as sender_name, u.photourl as sender_photo, u.role as sender_role
+                FROM messages m
+                JOIN users u ON u.id = m.senderid
+                ${whereClause}
+                ORDER BY m.createdat DESC
+                LIMIT ${parseInt(limit)}
+            `);
+
+            // Отмечаем как прочитанные
+            await prisma.$executeRaw`
+                UPDATE messages
+                SET isread = true
+                WHERE senderid = ${otherUserId}::uuid
+                  AND receiverid = ${userId}::uuid
+                  AND isread = false
+            `;
+
+            const formatted = messages.reverse().map(m => ({
+                id: Number(m.id),
+                senderId: m.senderid,
+                receiverId: m.receiverid,
+                content: m.content,
+                isRead: m.isread,
+                edited: m.edited || false,
+                createdAt: m.createdat,
+                sender: {
+                    id: m.senderid,
+                    fullName: m.sender_name,
+                    photoUrl: m.sender_photo,
+                    role: m.sender_role,
+                }
+            }));
+
+            res.json({ success: true, messages: formatted });
+        } catch (error) {
+            console.error('getChatHistory error:', error);
+            res.status(500).json({ error: 'Ошибка при получении истории' });
+        }
+    }
+
+    // Количество непрочитанных сообщений
+    async getUnreadCount(req, res) {
+        try {
+            const { id: userId } = req.user;
+            const result = await prisma.$queryRaw`
+                SELECT COUNT(*)::int as count
+                FROM messages
+                WHERE receiverid = ${userId}::uuid AND isread = false
+            `;
+            res.json({ success: true, count: result[0]?.count || 0 });
+        } catch (error) {
+            console.error('getUnreadCount error:', error);
+            res.status(500).json({ error: 'Ошибка' });
+        }
+    }
+
+    // Редактировать своё сообщение
+    async editMessage(req, res) {
+        try {
+            const { id: userId } = req.user;
+            const { messageId } = req.params;
+            const { content } = req.body;
+
+            if (!content?.trim()) {
+                return res.status(400).json({ error: 'Текст сообщения не может быть пустым' });
+            }
+
+            const existing = await prisma.$queryRaw`
+                SELECT id, senderid, receiverid FROM messages WHERE id = ${parseInt(messageId)}
+            `;
+            if (!existing[0]) return res.status(404).json({ error: 'Сообщение не найдено' });
+            if (existing[0].senderid !== userId) return res.status(403).json({ error: 'Нельзя редактировать чужое сообщение' });
+
+            await prisma.$executeRaw`
+                UPDATE messages SET content = ${content.trim()}, edited = true WHERE id = ${parseInt(messageId)}
+            `;
+
+            res.json({ success: true, messageId: parseInt(messageId), content: content.trim() });
+        } catch (error) {
+            console.error('editMessage error:', error);
+            res.status(500).json({ error: 'Ошибка при редактировании сообщения' });
+        }
+    }
+
+    // Удалить своё сообщение
+    async deleteMessage(req, res) {
+        try {
+            const { id: userId } = req.user;
+            const { messageId } = req.params;
+
+            const existing = await prisma.$queryRaw`
+                SELECT id, senderid, receiverid FROM messages WHERE id = ${parseInt(messageId)}
+            `;
+            if (!existing[0]) return res.status(404).json({ error: 'Сообщение не найдено' });
+            if (existing[0].senderid !== userId) return res.status(403).json({ error: 'Нельзя удалить чужое сообщение' });
+
+            const receiverId = existing[0].receiverid;
+
+            await prisma.$executeRaw`DELETE FROM messages WHERE id = ${parseInt(messageId)}`;
+
+            res.json({ success: true, messageId: parseInt(messageId), receiverId });
+        } catch (error) {
+            console.error('deleteMessage error:', error);
+            res.status(500).json({ error: 'Ошибка при удалении сообщения' });
+        }
+    }
+
+    // Удалить диалог (все сообщения между двумя пользователями)
+    async deleteDialog(req, res) {
+        try {
+            const { id: userId } = req.user;
+            const { userId: otherUserId } = req.params;
+
+            await prisma.$executeRaw`
+                DELETE FROM messages
+                WHERE (senderid = ${userId}::uuid AND receiverid = ${otherUserId}::uuid)
+                   OR (senderid = ${otherUserId}::uuid AND receiverid = ${userId}::uuid)
+            `;
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error('deleteDialog error:', error);
+            res.status(500).json({ error: 'Ошибка при удалении диалога' });
+        }
+    }
+
+    // Поиск пользователей для нового чата
+    async searchChatUsers(req, res) {
+        try {
+            const { id: userId, role } = req.user;
+            const { q } = req.query;
+
+            if (!q || q.trim().length < 2) {
+                return res.json({ success: true, users: [] });
+            }
+
+            const search = `%${q.trim().toLowerCase()}%`;
+
+            // Определяем кому можно писать в зависимости от роли
+            let roleFilter = {};
+            if (role === 'client') {
+                // Клиент может писать только тренерам
+                roleFilter = { role: 'trainer' };
+            } else if (role === 'trainer') {
+                // Тренер может писать клиентам и другим тренерам
+                roleFilter = { role: { in: ['client', 'trainer'] } };
+            }
+            // Админ может писать всем
+
+            const users = await prisma.user.findMany({
+                where: {
+                    id: { not: userId },
+                    isActive: true,
+                    ...roleFilter,
+                    fullName: { contains: q.trim(), mode: 'insensitive' },
+                },
+                select: { id: true, fullName: true, photoUrl: true, role: true },
+                take: 10,
+            });
+
+            res.json({ success: true, users });
+        } catch (error) {
+            console.error('searchChatUsers error:', error);
+            res.status(500).json({ error: 'Ошибка поиска' });
         }
     }
 
