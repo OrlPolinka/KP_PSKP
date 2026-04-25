@@ -9,11 +9,10 @@ EXPOSE 5000
 CMD ["npm", "run", "dev"]
 
 FROM base AS production
-RUN npm ci --only=production
+RUN npm ci
 COPY . .
-RUN npx prisma generate
+RUN ./node_modules/.bin/prisma generate
 EXPOSE 5000
-# wait-for-postgres.sh ждёт БД перед запуском
 COPY wait-for-postgres.sh /wait-for-postgres.sh
 RUN chmod +x /wait-for-postgres.sh
 CMD ["/wait-for-postgres.sh", "postgres", "node", "src/server.js"]
