@@ -24,7 +24,7 @@ const AdminDashboard = () => {
             <div className="card" style={{ cursor: 'pointer', transition: 'transform 0.2s' }}>
               <div style={{ fontSize: '48px', textAlign: 'center' }}>{item.icon}</div>
               <h3 style={{ textAlign: 'center', marginTop: '10px' }}>{item.title}</h3>
-              <p style={{ textAlign: 'center', color: '#666' }}>{item.description}</p>
+              <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>{item.description}</p>
             </div>
           </Link>
         ))}

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test CSS Variables</title>
+    <style>
+        :root {
+            --primary: #8B5CF6;
+            --primary-dark: #7C3AED;
+            --primary-light: #A78BFA;
+            --secondary: #EC4899;
+            --dark: #0F0F1A;
+            --text-primary: #F8FAFC;
+        }
+        
+        body {
+            background-color: var(--dark);
+            color: var(--text-primary);
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        
+        .test-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .test-table thead tr {
+            background: rgba(139, 92, 246, 0.15);
+            border-bottom: 2px solid rgba(139, 92, 246, 0.3);
+        }
+        
+        .test-table thead th {
+            padding: 16px 20px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--primary-light);
+            background: rgba(139, 92, 246, 0.1);
+        }
+        
+        .test-table tbody tr {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .test-table tbody td {
+            padding: 16px 20px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .color-box {
+            width: 50px;
+            height: 50px;
+            display: inline-block;
+            margin: 10px;
+            border: 1px solid white;
+        }
+        
+        .primary { background-color: var(--primary); }
+        .primary-light { background-color: var(--primary-light); }
+        .primary-dark { background-color: var(--primary-dark); }
+    </style>
+</head>
+<body>
+    <h1>CSS Variables Test</h1>
+    <p>This tests if CSS variables are working correctly.</p>
+    
+    <h2>Color Variables:</h2>
+    <div class="color-box primary">Primary</div>
+    <div class="color-box primary-light">Primary Light</div>
+    <div class="color-box primary-dark">Primary Dark</div>
+    
+    <h2>Table Test:</h2>
+    <table class="test-table">
+        <thead>
+            <tr>
+                <th>Column 1</th>
+                <th>Column 2</th>
+                <th>Column 3</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Row 1, Cell 1</td>
+                <td>Row 1, Cell 2</td>
+                <td>Row 1, Cell 3</td>
+            </tr>
+            <tr>
+                <td>Row 2, Cell 1</td>
+                <td>Row 2, Cell 2</td>
+                <td>Row 2, Cell 3</td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <p>Table headers should be purple (var(--primary-light) = #A78BFA), not white.</p>
+</body>
+</html>

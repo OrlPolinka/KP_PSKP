@@ -25,29 +25,50 @@ model User {
   trainerInfo       Trainer[]
   sentMessages      Message[]       @relation("MessageSender")
   receivedMessages  Message[]       @relation("MessageReceiver")
+  notifications     Notification[]  @relation("NotificationToUser")
+  payments          Payment[]       @relation("PaymentToUser")
 
   @@map("users")
 }
 
 model Trainer {
-  id                 String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId             String?    @map("userid") @db.Uuid
+  id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String?         @map("userid") @db.Uuid
   specialization     String?
-  bio                String?
-  photoUrl           String?    @map("photourl") @db.VarChar(500)
-  hireDate           DateTime?  @map("hiredate") @db.Date
-  schedulesAsTrainer Schedule[] @relation("ScheduleToTrainer")
-  user               User?      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  bio                String?         @db.Text
+  photoUrl           String?         @map("photourl") @db.Text
+  videoUrl           String?         @map("videourl") @db.Text
+  gallery            String?         @db.Text // JSON массив URL фото/видео
+  achievements       String?         @db.Text
+  experience         Int?
+  hireDate           DateTime?       @map("hiredate") @db.Date
+  // Новые поля для публичной страницы тренера
+  customPageTitle    String?         @map("custompagetitle") @db.VarChar(255)
+  customPageContent  String?         @map("custompagecontent") @db.Text
+  education          String?         @db.Text
+  certificates       String?         @db.Text // JSON массив сертификатов
+  socialLinks        String?         @map("sociallinks") @db.Text // JSON массив ссылок на соцсети
+  isPublished        Boolean?        @default(false) @map("ispublished")
+  schedulesAsTrainer Schedule[]      @relation("ScheduleToTrainer")
+  user               User?           @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("trainers")
 }
 
 model DanceStyle {
-  id          Int        @id @default(autoincrement())
-  name        String     @unique @db.VarChar(100)
-  description String?
-  isActive    Boolean?   @default(true) @map("isactive")
-  schedules   Schedule[]
+  id              Int        @id @default(autoincrement())
+  name            String     @unique @db.VarChar(100)
+  description     String?    @db.Text
+  isActive        Boolean?   @default(true) @map("isactive")
+  // Новые поля для подробной информации
+  longDescription String?    @map("longdescription") @db.Text
+  videoUrl        String?    @map("videourl") @db.Text
+  imageUrl        String?    @map("imageurl") @db.Text
+  benefits        String?    @db.Text // JSON массив преимуществ
+  difficulty      String?    @default("beginner") @db.VarChar(20) // beginner, intermediate, advanced
+  duration        Int?       // средняя длительность в минутах
+  calories        Int?       // среднее количество калорий
+  schedules       Schedule[]
 
   @@map("dancestyles")
 }
@@ -88,9 +109,11 @@ model Membership {
   pricePaid        Decimal        @map("pricepaid") @db.Decimal(10, 2)
   pausedAt         DateTime?      @map("pausedat") @db.Date
   pausedUntil      DateTime?      @map("pauseduntill") @db.Date
+  paymentId        String?        @map("paymentid") @db.Uuid
   bookings         Booking[]
   client           User           @relation("MembershipToClient", fields: [clientId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   membershipType   MembershipType @relation(fields: [membershipTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payment          Payment?       @relation(fields: [paymentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("memberships")
 }
@@ -106,7 +129,9 @@ model Schedule {
   maxCapacity        Int        @map("maxcapacity")
   currentBookings    Int?       @default(0) @map("currentbookings")
   status             String?    @default("scheduled") @db.VarChar(20)
-  cancellationReason String?    @map("cancellationreason")
+  cancellationReason String?    @map("cancellationreason") @db.Text
+  cancelledBy        String?    @map("cancelledby") @db.Uuid
+  cancelledAt        DateTime?  @map("cancelledat") @db.Timestamp(6)
   createdBy          String     @map("createdby") @db.Uuid
   createdAt          DateTime?  @default(now()) @map("createdat") @db.Timestamp(6)
   bookings           Booking[]
@@ -127,6 +152,11 @@ model Booking {
   status          String?          @default("booked") @db.VarChar(20)
   cancelledAt     DateTime?        @map("cancelledat") @db.Timestamp(6)
   cancelledBy     String?          @map("cancelledby") @db.Uuid
+  // QR-код для посещения
+  qrCode          String?          @map("qrcode") @db.VarChar(255)
+  qrCodeGenerated DateTime?        @map("qrcodegenerated") @db.Timestamp(6)
+  checkedIn       Boolean?         @default(false) @map("checkedin")
+  checkedInAt     DateTime?        @map("checkedinat") @db.Timestamp(6)
   attendanceLogs  AttendanceLog[]
   history         BookingHistory[]
   cancelledByUser User?            @relation("BookingCancelledBy", fields: [cancelledBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -171,4 +201,56 @@ model Message {
   @@index([senderId, receiverId])
   @@index([createdAt])
   @@map("messages")
+}
+
+// Новая модель для уведомлений
+model Notification {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @map("userid") @db.Uuid
+  type        String    @db.VarChar(50) // booking_cancelled, class_cancelled, reminder, etc.
+  title       String    @db.VarChar(255)
+  message     String    @db.Text
+  data        String?   @db.Text // JSON с дополнительными данными
+  isRead      Boolean   @default(false) @map("isread")
+  createdAt   DateTime  @default(now()) @map("createdat") @db.Timestamp(6)
+  user        User      @relation("NotificationToUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// Новая модель для информации о подготовке к тренировкам
+model TrainingInfo {
+  id          Int       @id @default(autoincrement())
+  title       String    @db.VarChar(255)
+  content     String    @db.Text
+  category    String    @db.VarChar(50) // preparation, what_to_bring, rules, tips
+  videoUrl    String?   @map("videourl") @db.Text
+  imageUrl    String?   @map("imageurl") @db.Text
+  order       Int       @default(0)
+  isActive    Boolean?  @default(true) @map("isactive")
+  createdAt   DateTime? @default(now()) @map("createdat") @db.Timestamp(6)
+  updatedAt   DateTime? @updatedAt @map("updatedat") @db.Timestamp(6)
+
+  @@map("traininginfo")
+}
+
+// Новая модель для платежей
+model Payment {
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String      @map("userid") @db.Uuid
+  amount          Decimal     @db.Decimal(10, 2)
+  currency        String      @default("RUB") @db.VarChar(3)
+  status          String      @default("pending") @db.VarChar(20) // pending, succeeded, failed, refunded
+  provider        String      @db.VarChar(50) // yookassa, stripe, etc.
+  providerPaymentId String?   @map("providerpaymentid") @db.VarChar(255)
+  description     String?     @db.Text
+  metadata        String?     @db.Text // JSON с дополнительными данными
+  createdAt       DateTime    @default(now()) @map("createdat") @db.Timestamp(6)
+  updatedAt       DateTime?   @updatedAt @map("updatedat") @db.Timestamp(6)
+  user            User        @relation("PaymentToUser", fields: [userId], references: [id], onDelete: Cascade)
+  memberships     Membership[]
+
+  @@map("payments")
 }

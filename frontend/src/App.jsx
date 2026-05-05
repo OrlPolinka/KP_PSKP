@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ChatProvider } from './context/ChatContext';
-import Navbar from './components/Layout/Navbar';
+import Sidebar from './components/Layout/Sidebar';
 import PrivateRoute from './components/common/PrivateRoute';
 import RoleRoute from './components/common/RoleRoute';
 
@@ -18,11 +18,17 @@ import Schedule from './pages/client/Schedule';
 import MyBookings from './pages/client/MyBookings';
 import MyMemberships from './pages/client/MyMemberships';
 import History from './pages/client/History';
+import Trainers from './pages/client/Trainers';
+import TrainerProfile from './pages/client/TrainerProfile';
+import DanceStyles from './pages/client/DanceStyles';
+import TrainingInfo from './pages/client/TrainingInfo';
+import MyBookingsQR from './pages/client/MyBookingsQR';
 
 // Trainer Pages
 import TrainerSchedule from './pages/trainer/TrainerSchedule';
 import ClassAttendance from './pages/trainer/ClassAttendance';
 import MyClasses from './pages/trainer/MyClasses';
+import TrainerProfileEdit from './pages/trainer/TrainerProfileEdit';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -32,6 +38,8 @@ import ScheduleManager from './pages/admin/ScheduleManager';
 import MembershipTypesManager from './pages/admin/MembershipTypesManager';
 import MembershipsManager from './pages/admin/MembershipsManager';
 import Analytics from './pages/admin/Analytics';
+import DanceStylesManager from './pages/admin/DanceStylesManager';
+import TrainingInfoManager from './pages/admin/TrainingInfoManager';
 
 const AppRoutes = () => {
   const { user } = useAuth();
@@ -48,44 +56,54 @@ const AppRoutes = () => {
 
   return (
     <Router>
-      <Navbar />
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={user ? <Navigate to={getDefaultRoute()} /> : <Home />} />
-        <Route path="/home" element={<Home />} />
-        <Route path="/login" element={user ? <Navigate to={getDefaultRoute()} /> : <Login />} />
-        <Route path="/register" element={user ? <Navigate to={getDefaultRoute()} /> : <Register />} />
+      {user && <Sidebar />}
+      <div className={`main-content ${user ? '' : 'no-sidebar'}`}>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={user ? <Navigate to={getDefaultRoute()} /> : <Home />} />
+          <Route path="/home" element={<Home />} />
+          <Route path="/login" element={user ? <Navigate to={getDefaultRoute()} /> : <Login />} />
+          <Route path="/register" element={user ? <Navigate to={getDefaultRoute()} /> : <Register />} />
 
-        {/* Protected Routes */}
-        <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+          {/* Protected Routes */}
+          <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
 
-        {/* Client Routes */}
-        <Route path="/schedule" element={<RoleRoute allowedRoles={['client', 'admin', 'trainer']}><Schedule /></RoleRoute>} />
-        <Route path="/my-bookings" element={<RoleRoute allowedRoles={['client']}><MyBookings /></RoleRoute>} />
-        <Route path="/my-memberships" element={<RoleRoute allowedRoles={['client']}><MyMemberships /></RoleRoute>} />
-        <Route path="/history" element={<RoleRoute allowedRoles={['client']}><History /></RoleRoute>} />
+          {/* Client Routes */}
+          <Route path="/schedule" element={<RoleRoute allowedRoles={['client', 'admin', 'trainer']}><Schedule /></RoleRoute>} />
+          <Route path="/my-bookings" element={<RoleRoute allowedRoles={['client']}><MyBookings /></RoleRoute>} />
+          <Route path="/my-qr-codes" element={<RoleRoute allowedRoles={['client']}><MyBookingsQR /></RoleRoute>} />
+          <Route path="/my-memberships" element={<RoleRoute allowedRoles={['client']}><MyMemberships /></RoleRoute>} />
+          <Route path="/history" element={<RoleRoute allowedRoles={['client']}><History /></RoleRoute>} />
+          <Route path="/trainers" element={<RoleRoute allowedRoles={['client']}><Trainers /></RoleRoute>} />
+          <Route path="/trainers/:id" element={<RoleRoute allowedRoles={['client']}><TrainerProfile /></RoleRoute>} />
+          <Route path="/dance-styles" element={<RoleRoute allowedRoles={['client']}><DanceStyles /></RoleRoute>} />
+          <Route path="/training-info" element={<RoleRoute allowedRoles={['client']}><TrainingInfo /></RoleRoute>} />
 
-        {/* Trainer Routes */}
-        <Route path="/trainer/schedule" element={<RoleRoute allowedRoles={['trainer', 'admin']}><TrainerSchedule /></RoleRoute>} />
-        <Route path="/trainer/classes" element={<RoleRoute allowedRoles={['trainer', 'admin']}><ClassAttendance /></RoleRoute>} />
-        <Route path="/trainer/my-classes" element={<RoleRoute allowedRoles={['trainer', 'admin']}><MyClasses /></RoleRoute>} />
+          {/* Trainer Routes */}
+          <Route path="/trainer/schedule" element={<RoleRoute allowedRoles={['trainer', 'admin']}><TrainerSchedule /></RoleRoute>} />
+          <Route path="/trainer/classes" element={<RoleRoute allowedRoles={['trainer', 'admin']}><ClassAttendance /></RoleRoute>} />
+          <Route path="/trainer/my-classes" element={<RoleRoute allowedRoles={['trainer', 'admin']}><MyClasses /></RoleRoute>} />
+          <Route path="/trainer/profile" element={<RoleRoute allowedRoles={['trainer']}><TrainerProfileEdit /></RoleRoute>} />
 
-        {/* Admin Routes */}
-        <Route path="/admin/dashboard" element={<RoleRoute allowedRoles={['admin']}><AdminDashboard /></RoleRoute>} />
-        <Route path="/admin/users" element={<RoleRoute allowedRoles={['admin']}><UsersList /></RoleRoute>} />
-        <Route path="/admin/trainers" element={<RoleRoute allowedRoles={['admin']}><TrainersList /></RoleRoute>} />
-        <Route path="/admin/schedule" element={<RoleRoute allowedRoles={['admin']}><ScheduleManager /></RoleRoute>} />
-        <Route path="/admin/membership-types" element={<RoleRoute allowedRoles={['admin']}><MembershipTypesManager /></RoleRoute>} />
-        <Route path="/admin/memberships" element={<RoleRoute allowedRoles={['admin']}><MembershipsManager /></RoleRoute>} />
-        <Route path="/admin/analytics" element={<RoleRoute allowedRoles={['admin']}><Analytics /></RoleRoute>} />
+          {/* Admin Routes */}
+          <Route path="/admin/dashboard" element={<RoleRoute allowedRoles={['admin']}><AdminDashboard /></RoleRoute>} />
+          <Route path="/admin/users" element={<RoleRoute allowedRoles={['admin']}><UsersList /></RoleRoute>} />
+          <Route path="/admin/trainers" element={<RoleRoute allowedRoles={['admin']}><TrainersList /></RoleRoute>} />
+          <Route path="/admin/schedule" element={<RoleRoute allowedRoles={['admin']}><ScheduleManager /></RoleRoute>} />
+          <Route path="/admin/membership-types" element={<RoleRoute allowedRoles={['admin']}><MembershipTypesManager /></RoleRoute>} />
+          <Route path="/admin/memberships" element={<RoleRoute allowedRoles={['admin']}><MembershipsManager /></RoleRoute>} />
+          <Route path="/admin/analytics" element={<RoleRoute allowedRoles={['admin']}><Analytics /></RoleRoute>} />
+          <Route path="/admin/dance-styles" element={<RoleRoute allowedRoles={['admin']}><DanceStylesManager /></RoleRoute>} />
+          <Route path="/admin/training-info" element={<RoleRoute allowedRoles={['admin']}><TrainingInfoManager /></RoleRoute>} />
 
-        {/* Chat */}
-        <Route path="/chat" element={<PrivateRoute><Chat /></PrivateRoute>} />
-        <Route path="/chat/:userId" element={<PrivateRoute><Chat /></PrivateRoute>} />
+          {/* Chat */}
+          <Route path="/chat" element={<PrivateRoute><Chat /></PrivateRoute>} />
+          <Route path="/chat/:userId" element={<PrivateRoute><Chat /></PrivateRoute>} />
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to={getDefaultRoute()} />} />
-      </Routes>
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to={getDefaultRoute()} />} />
+        </Routes>
+      </div>
     </Router>
   );
 };

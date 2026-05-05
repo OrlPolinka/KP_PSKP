@@ -258,9 +258,11 @@ const Profile = () => {
             <span className={`badge ${getRoleBadge(profile?.role)}`}>
               {getRoleName(profile?.role)}
             </span>
-            <span className={`badge ${profile?.isActive ? 'badge-success' : 'badge-danger'}`}>
-              {profile?.isActive ? '🟢 Активен' : '🔴 Заблокирован'}
-            </span>
+            {profile?.role !== 'admin' && (
+              <span className={`badge ${profile?.isActive === false ? 'badge-danger' : 'badge-success'}`}>
+                {profile?.isActive === false ? '🔴 Заблокирован' : '🟢 Активен'}
+              </span>
+            )}
           </div>
           <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px' }}>
             📧 {profile?.email}

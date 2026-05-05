@@ -14,5 +14,6 @@ COPY . .
 RUN ./node_modules/.bin/prisma generate
 EXPOSE 5000
 COPY wait-for-postgres.sh /wait-for-postgres.sh
-RUN chmod +x /wait-for-postgres.sh
-CMD ["/wait-for-postgres.sh", "postgres", "node", "src/server.js"]
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /wait-for-postgres.sh /entrypoint.sh
+CMD ["/wait-for-postgres.sh", "postgres", "/entrypoint.sh"]

@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
+const prisma = require('../controler/prisma');
 
-let authMiddleware = (req, res, next) => {
+let authMiddleware = async (req, res, next) => {
     let authHeader = req.headers.authorization;
 
     if(!authHeader){
@@ -11,7 +12,26 @@ let authMiddleware = (req, res, next) => {
 
     try{
         let decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded;
+        
+        // Проверяем, активен ли пользователь
+        const user = await prisma.user.findUnique({
+            where: { id: decoded.id },
+            select: { id: true, email: true, role: true, isActive: true }
+        });
+        
+        if(!user){
+            return res.status(401).json({error: 'Пользователь не найден'});
+        }
+        
+        if(!user.isActive){
+            return res.status(403).json({error: 'Аккаунт заблокирован. Обратитесь к администратору'});
+        }
+        
+        req.user = {
+            id: user.id,
+            email: user.email,
+            role: user.role
+        };
         next();
     }
     catch(error){

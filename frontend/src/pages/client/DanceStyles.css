@@ -1,0 +1,207 @@
+.dance-styles-page {
+  padding: 30px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.page-header h1 {
+  font-size: 2.2rem;
+  color: #1a1a2e;
+  margin-bottom: 10px;
+}
+
+.page-header p {
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.styles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 25px;
+}
+
+.style-card {
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.style-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px rgba(139, 92, 246, 0.15);
+}
+
+.style-card-header {
+  position: relative;
+  height: 180px;
+  background: linear-gradient(135deg, #8B5CF6, #EC4899);
+}
+
+.style-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.style-header-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  color: #fff;
+}
+
+.style-header-overlay h3 {
+  font-size: 1.4rem;
+  margin-bottom: 10px;
+}
+
+.style-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.difficulty-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.duration,
+.calories {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.style-card-body {
+  padding: 20px;
+}
+
+.style-description {
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 0;
+}
+
+.style-details {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+
+.detail-section {
+  margin-bottom: 20px;
+}
+
+.detail-section h4 {
+  font-size: 1rem;
+  color: #1a1a2e;
+  margin-bottom: 10px;
+}
+
+.detail-section p {
+  color: #555;
+  line-height: 1.7;
+}
+
+.benefits-list {
+  list-style: none;
+  padding: 0;
+}
+
+.benefits-list li {
+  padding: 8px 0;
+  color: #444;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.benefits-list li:last-child {
+  border-bottom: none;
+}
+
+.video-section .video-container {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.video-container iframe,
+.video-container video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.view-schedule-btn {
+  display: inline-block;
+  padding: 12px 25px;
+  background: linear-gradient(135deg, #8B5CF6, #EC4899);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 10px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.view-schedule-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(139, 92, 246, 0.4);
+}
+
+.style-card-footer {
+  padding: 15px 20px;
+  background: #f8f9fa;
+  text-align: center;
+}
+
+.expand-hint {
+  color: #8B5CF6;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.style-card.expanded {
+  grid-column: span 2;
+}
+
+@media (max-width: 900px) {
+  .style-card.expanded {
+    grid-column: span 1;
+  }
+}
+
+.no-styles {
+  text-align: center;
+  padding: 60px;
+  color: #666;
+}
+
+.loading-spinner {
+  text-align: center;
+  padding: 60px;
+  color: #666;
+}
+
+.error-message {
+  text-align: center;
+  padding: 60px;
+  color: #ef4444;
+}

@@ -77,20 +77,21 @@ const NewChatModal = ({ onClose, onSelect, currentUserId, userRole }) => {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: '420px', background: 'var(--dark, #0F0F1A)', color: 'white' }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">Новый чат</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <h2 className="modal-title" style={{ color: 'white' }}>Новый чат</h2>
+          <button className="modal-close" onClick={onClose} style={{ color: 'white' }}>×</button>
         </div>
-        <div style={{ padding: '0 0 16px' }}>
-          <div style={{ position: 'relative', marginBottom: '16px' }}>
-            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)' }}>🔍</span>
+        <div className="modal-body" style={{ padding: '0 0 16px' }}>
+          <div className="form-group" style={{ position: 'relative', marginBottom: '16px' }}>
+            <span className="search-icon" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)' }}>🔍</span>
             <input
               autoFocus
               type="text"
               placeholder="Введите имя..."
               value={query}
               onChange={e => search(e.target.value)}
+              className="search-input"
               style={{
                 width: '100%', padding: '10px 12px 10px 36px',
                 background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
@@ -113,6 +114,7 @@ const NewChatModal = ({ onClose, onSelect, currentUserId, userRole }) => {
               const badge = getRoleBadge(u.role);
               return (
                 <div key={u.id} onClick={() => onSelect(u)}
+                  className="contact-item"
                   style={{
                     display: 'flex', alignItems: 'center', gap: '12px',
                     padding: '10px 4px', cursor: 'pointer', borderRadius: '8px',
@@ -170,13 +172,60 @@ const Chat = () => {
   const fetchContacts = useCallback(async () => {
     try {
       const res = await api.get('/chat/contacts');
-      setContacts(res.data.contacts || []);
+      let contactsData = res.data.contacts || [];
+      
+      // Если контактов нет, загружаем список пользователей в зависимости от роли
+      if (contactsData.length === 0) {
+        try {
+          if (user.role === 'admin') {
+            // Админ видит всех пользователей
+            const usersRes = await api.get('/users');
+            contactsData = (usersRes.data.users || []).map(u => ({
+              id: u.id,
+              fullName: u.fullName,
+              photoUrl: u.photoUrl,
+              role: u.role,
+              isActive: u.isActive,
+              unreadCount: 0,
+              lastMessage: null
+            }));
+          } else if (user.role === 'trainer') {
+            // Тренер видит клиентов
+            const clientsRes = await api.get('/users?role=client');
+            contactsData = (clientsRes.data.users || []).map(u => ({
+              id: u.id,
+              fullName: u.fullName,
+              photoUrl: u.photoUrl,
+              role: u.role,
+              isActive: u.isActive,
+              unreadCount: 0,
+              lastMessage: null
+            }));
+          } else if (user.role === 'client') {
+            // Клиент видит тренеров
+            const trainersRes = await api.get('/trainers');
+            contactsData = (trainersRes.data.trainers || []).map(t => ({
+              id: t.id,
+              fullName: t.fullName,
+              photoUrl: t.photoUrl,
+              role: 'trainer',
+              isActive: t.isActive,
+              unreadCount: 0,
+              lastMessage: null
+            }));
+          }
+        } catch (err) {
+          console.error('Error loading user list:', err);
+        }
+      }
+      
+      setContacts(contactsData);
     } catch (err) {
       console.error('fetchContacts error:', err);
     } finally {
       setLoadingContacts(false);
     }
-  }, []);
+  }, [user.role]);
 
   useEffect(() => { fetchContacts(); }, [fetchContacts]);
 
@@ -409,6 +458,46 @@ const Chat = () => {
             />
           </div>
         </div>
+
+        {/* User list section for new chats */}
+        {!searchContacts && filteredContacts.length > 0 && (
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {user.role === 'admin' ? '👥 Все пользователи' : 
+                 user.role === 'trainer' ? '🎓 Клиенты' : 
+                 '🏋️ Тренеры'}
+              </span>
+              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>{filteredContacts.length}</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {filteredContacts.slice(0, 5).map(contact => (
+                <div key={contact.id} onClick={() => selectContact(contact)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '6px 10px', borderRadius: '16px',
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                    fontSize: '12px', color: 'rgba(255,255,255,0.7)',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                >
+                  <Avatar user={contact} size={20} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px' }}>
+                    {contact.fullName}
+                  </span>
+                </div>
+              ))}
+              {filteredContacts.length > 5 && (
+                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', padding: '6px 10px' }}>
+                  +{filteredContacts.length - 5} еще
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Contacts list */}
         <div style={{ flex: 1, overflowY: 'auto' }}>

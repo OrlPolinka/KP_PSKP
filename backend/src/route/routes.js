@@ -1,5 +1,6 @@
 const express = require('express');
 const Controller = require('../controler/controllers');
+const newControllers = require('../controler/newControllers');
 const {authMiddleware, roleMiddleware} = require('../middleware/auth');
 const passportModule = require('../middleware/googleAuth');
 const passport = passportModule;
@@ -122,6 +123,41 @@ const routes = [
     {method: 'delete',             path: '/chat/messages/:messageId',              action: 'deleteMessage'},
     {method: 'delete',             path: '/chat/dialog/:userId',                   action: 'deleteDialog'},
     
+    // ─── Новые маршруты ─────────────────────────────────────────────────────────
+    
+    // Публичные страницы тренеров
+    {method: 'get',                path: '/public/trainers',                       handler: newControllers.getPublicTrainers, public: true},
+    {method: 'get',                path: '/public/trainers/:id',                   handler: newControllers.getPublicTrainerById, public: true},
+    {method: 'put',                path: '/trainer/profile/:id',                   handler: newControllers.updateTrainerProfile},
+    
+    // Стили танцев (с подробной информацией)
+    {method: 'get',                path: '/dance-styles-detailed',                 handler: newControllers.getDanceStylesDetailed},
+    {method: 'get',                path: '/dance-styles-detailed/:id',             handler: newControllers.getDanceStyleById},
+    {method: 'put',                path: '/dance-styles-detailed/:id',             handler: newControllers.updateDanceStyleDetailed},
+    
+    // Информация о подготовке к тренировкам
+    {method: 'get',                path: '/training-info',                         handler: newControllers.getTrainingInfo, public: true},
+    {method: 'post',               path: '/training-info',                         handler: newControllers.createTrainingInfo},
+    {method: 'put',                path: '/training-info/:id',                     handler: newControllers.updateTrainingInfo},
+    {method: 'delete',             path: '/training-info/:id',                     handler: newControllers.deleteTrainingInfo},
+    
+    // QR-коды для посещений
+    {method: 'get',                path: '/bookings/:bookingId/qrcode',            handler: newControllers.generateBookingQRCode},
+    {method: 'post',               path: '/bookings/verify-qrcode',                handler: newControllers.verifyBookingQRCode},
+    
+    // Уведомления
+    {method: 'get',                path: '/notifications',                         handler: newControllers.getNotifications},
+    {method: 'put',                path: '/notifications/:id/read',                handler: newControllers.markNotificationRead},
+    {method: 'put',                path: '/notifications/read-all',                handler: newControllers.markAllNotificationsRead},
+    
+    // Отмена занятия тренером
+    {method: 'put',                path: '/schedule/:id/cancel-by-trainer',        handler: newControllers.cancelScheduleByTrainer},
+    
+    // Платежи
+    {method: 'post',               path: '/payments',                              handler: newControllers.createPayment},
+    {method: 'post',               path: '/payments/webhook',                      handler: newControllers.paymentWebhook, public: true},
+    {method: 'get',                path: '/payments/history',                      handler: newControllers.getPaymentHistory},
+    
 ];
 
 routes.forEach(route => {
@@ -132,7 +168,13 @@ routes.forEach(route => {
     if(route.roles && route.roles.length > 0){
         handlers.push(roleMiddleware(...route.roles));
     }
-    handlers.push((req, res) => controler[route.action](req, res));
+    
+    // Поддержка как старых action, так и новых handler
+    if (route.handler) {
+        handlers.push(route.handler);
+    } else {
+        handlers.push((req, res) => controler[route.action](req, res));
+    }
 
     router[route.method](`/api${route.path}`, ...handlers);
 });
