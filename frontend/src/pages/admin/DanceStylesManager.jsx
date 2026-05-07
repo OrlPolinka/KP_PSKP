@@ -21,6 +21,58 @@ const DanceStylesManager = () => {
     isActive: true
   });
 
+  const videoFileRef = React.useRef();
+  const imageFileRef = React.useRef();
+
+  const compressImage = (file) => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX = 600;
+        let w = img.width, h = img.height;
+        if (w > h) { if (w > MAX) { h = h * MAX / w; w = MAX; } }
+        else { if (h > MAX) { w = w * MAX / h; h = MAX; } }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  const readFileAsBase64 = (file) => new Promise((resolve, reject) => {
+    if (file.size > 50 * 1024 * 1024) { reject(new Error('Файл слишком большой (макс. 50 МБ)')); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => resolve(ev.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const handleVideoFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const base64 = await readFileAsBase64(file);
+      setFormData(prev => ({ ...prev, videoUrl: base64 }));
+    } catch (err) { 
+      alert(err.message || 'Ошибка при загрузке видео'); 
+    }
+  };
+
+  const handleImageFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const base64 = await compressImage(file);
+      setFormData(prev => ({ ...prev, imageUrl: base64 }));
+    } catch (err) { 
+      alert('Ошибка при загрузке изображения'); 
+    }
+  };
+
   useEffect(() => {
     fetchStyles();
   }, []);
@@ -200,11 +252,55 @@ const DanceStylesManager = () => {
               <div className="form-row">
                 <div className="form-group">
                   <label>URL видео</label>
-                  <input name="videoUrl" value={formData.videoUrl} onChange={handleChange} />
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <input 
+                      name="videoUrl" 
+                      value={formData.videoUrl.startsWith('data:') ? '(загружено с компьютера)' : formData.videoUrl} 
+                      onChange={e => setFormData(prev => ({ ...prev, videoUrl: e.target.value }))}
+                      placeholder="https://... или выберите файл"
+                      style={{ flex: 1, minWidth: '200px' }}
+                      readOnly={formData.videoUrl.startsWith('data:')}
+                    />
+                    <button type="button" className="add-btn" onClick={() => videoFileRef.current?.click()}
+                      style={{ whiteSpace: 'nowrap', background: 'rgba(139,92,246,0.15)', color: 'var(--primary-light)' }}>
+                      🎬 Файл
+                    </button>
+                    {formData.videoUrl && (
+                      <button type="button" className="remove-btn" onClick={() => setFormData(prev => ({ ...prev, videoUrl: '' }))}>✕</button>
+                    )}
+                  </div>
+                  <input ref={videoFileRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={handleVideoFileChange} />
+                  {formData.videoUrl && formData.videoUrl.startsWith('data:video') && (
+                    <div style={{ marginTop: '10px' }}>
+                      <video src={formData.videoUrl} controls style={{ width: '100%', maxHeight: '150px', borderRadius: '8px' }} />
+                    </div>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>URL изображения</label>
-                  <input name="imageUrl" value={formData.imageUrl} onChange={handleChange} />
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <input 
+                      name="imageUrl" 
+                      value={formData.imageUrl.startsWith('data:') ? '(загружено с компьютера)' : formData.imageUrl} 
+                      onChange={e => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
+                      placeholder="https://... или выберите файл"
+                      style={{ flex: 1, minWidth: '200px' }}
+                      readOnly={formData.imageUrl.startsWith('data:')}
+                    />
+                    <button type="button" className="add-btn" onClick={() => imageFileRef.current?.click()}
+                      style={{ whiteSpace: 'nowrap', background: 'rgba(139,92,246,0.15)', color: 'var(--primary-light)' }}>
+                      📁 Файл
+                    </button>
+                    {formData.imageUrl && (
+                      <button type="button" className="remove-btn" onClick={() => setFormData(prev => ({ ...prev, imageUrl: '' }))}>✕</button>
+                    )}
+                  </div>
+                  <input ref={imageFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageFileChange} />
+                  {formData.imageUrl && formData.imageUrl.startsWith('data:image') && (
+                    <div style={{ marginTop: '10px' }}>
+                      <img src={formData.imageUrl} alt="preview" style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '8px' }} />
+                    </div>
+                  )}
                 </div>
               </div>
               

@@ -2,33 +2,35 @@
   padding: 30px;
   max-width: 900px;
   margin: 0 auto;
+  color: var(--text-primary);
 }
 
-.page-header {
+.trainer-profile-edit-page .page-header {
   margin-bottom: 30px;
 }
 
-.page-header h1 {
+.trainer-profile-edit-page .page-header h1 {
   font-size: 1.8rem;
-  color: #1a1a2e;
+  color: var(--text-primary);
   margin-bottom: 10px;
 }
 
-.page-header p {
-  color: #666;
+.trainer-profile-edit-page .page-header p {
+  color: var(--text-secondary);
 }
 
 .profile-form {
-  background: #fff;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   padding: 30px;
   border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow);
 }
 
 .form-section {
   margin-bottom: 30px;
   padding-bottom: 25px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .form-section:last-of-type {
@@ -37,7 +39,7 @@
 
 .form-section h2 {
   font-size: 1.2rem;
-  color: #1a1a2e;
+  color: var(--text-primary);
   margin-bottom: 20px;
 }
 
@@ -48,7 +50,7 @@
 .form-group label {
   display: block;
   font-weight: 500;
-  color: #333;
+  color: var(--text-secondary);
   margin-bottom: 8px;
 }
 
@@ -57,10 +59,12 @@
 .form-group select {
   width: 100%;
   padding: 12px 15px;
-  border: 2px solid #e0e0e0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
   border-radius: 10px;
   font-size: 0.95rem;
-  transition: border-color 0.3s ease;
+  transition: border-color 0.3s ease, background 0.3s ease;
 }
 
 .form-group input:focus,
@@ -68,6 +72,7 @@
 .form-group select:focus {
   border-color: #8B5CF6;
   outline: none;
+  background: rgba(139, 92, 246, 0.1);
 }
 
 .form-row {
@@ -95,8 +100,8 @@
 }
 
 .remove-btn {
-  background: #fee2e2;
-  color: #ef4444;
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
   border: none;
   border-radius: 8px;
   padding: 10px 15px;
@@ -105,21 +110,21 @@
 }
 
 .remove-btn:hover {
-  background: #fecaca;
+  background: rgba(239, 68, 68, 0.28);
 }
 
 .add-btn {
-  background: #f0f0f0;
+  background: rgba(255, 255, 255, 0.08);
   border: none;
   border-radius: 8px;
   padding: 10px 20px;
   cursor: pointer;
-  color: #666;
+  color: var(--text-secondary);
   transition: all 0.3s ease;
 }
 
 .add-btn:hover {
-  background: #e0e0e0;
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .checkbox-group label {
@@ -168,19 +173,19 @@
 }
 
 .message.success {
-  background: #d1fae5;
-  color: #065f46;
+  background: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
 }
 
 .message.error {
-  background: #fee2e2;
-  color: #991b1b;
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
 }
 
 .loading-spinner {
   text-align: center;
   padding: 60px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .error-message {

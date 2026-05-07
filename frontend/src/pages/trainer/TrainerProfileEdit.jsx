@@ -25,6 +25,83 @@ const TrainerProfileEdit = () => {
   const [certificates, setCertificates] = useState([]);
   const [socialLinks, setSocialLinks] = useState([]);
 
+  const photoFileRef = React.useRef();
+  const videoFileRef = React.useRef();
+  const galleryFileRefs = React.useRef({});
+
+  // Сжатие изображения перед сохранением
+  const compressImage = (file) => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX = 600;
+        let w = img.width, h = img.height;
+        if (w > h) { if (w > MAX) { h = h * MAX / w; w = MAX; } }
+        else { if (h > MAX) { w = w * MAX / h; h = MAX; } }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Конвертация видео в base64
+  const readFileAsBase64 = (file) => new Promise((resolve, reject) => {
+    if (file.size > 50 * 1024 * 1024) { reject(new Error('Файл слишком большой (макс. 50 МБ)')); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => resolve(ev.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const handlePhotoFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { setMessage({ type: 'error', text: 'Фото слишком большое (макс. 10 МБ)' }); return; }
+    try {
+      const base64 = await compressImage(file);
+      setFormData(prev => ({ ...prev, photoUrl: base64 }));
+      setMessage({ type: 'success', text: 'Фото загружено' });
+    } catch { setMessage({ type: 'error', text: 'Ошибка при загрузке фото' }); }
+  };
+
+  const handleVideoFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      setMessage({ type: 'success', text: 'Загрузка видео...' });
+      const base64 = await readFileAsBase64(file);
+      setFormData(prev => ({ ...prev, videoUrl: base64 }));
+      setMessage({ type: 'success', text: 'Видео загружено' });
+    } catch (err) { setMessage({ type: 'error', text: err.message || 'Ошибка при загрузке видео' }); }
+  };
+
+  const handleGalleryFileChange = async (e, index) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      let base64;
+      if (file.type.startsWith('image/')) {
+        base64 = await compressImage(file);
+      } else if (file.type.startsWith('video/')) {
+        base64 = await readFileAsBase64(file);
+      } else {
+        setMessage({ type: 'error', text: 'Поддерживаются только фото и видео' });
+        return;
+      }
+      const updated = [...gallery];
+      updated[index].url = base64;
+      setGallery(updated);
+      setMessage({ type: 'success', text: 'Файл загружен в галерею' });
+    } catch (err) { 
+      setMessage({ type: 'error', text: err.message || 'Ошибка при загрузке файла' }); 
+    }
+  };
+
   useEffect(() => {
     fetchTrainerProfile();
   }, []);
@@ -245,25 +322,59 @@ const TrainerProfileEdit = () => {
           <h2>Медиа</h2>
           
           <div className="form-group">
-            <label>URL фото профиля</label>
-            <input
-              type="url"
-              name="photoUrl"
-              value={formData.photoUrl}
-              onChange={handleChange}
-              placeholder="https://..."
-            />
+            <label>Фото профиля</label>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                name="photoUrl"
+                value={formData.photoUrl.startsWith('data:') ? '(загружено с компьютера)' : formData.photoUrl}
+                onChange={e => setFormData(prev => ({ ...prev, photoUrl: e.target.value }))}
+                placeholder="https://... или выберите файл"
+                style={{ flex: 1, minWidth: '200px' }}
+                readOnly={formData.photoUrl.startsWith('data:')}
+              />
+              <button type="button" className="add-btn" onClick={() => photoFileRef.current?.click()}
+                style={{ whiteSpace: 'nowrap', background: 'rgba(139,92,246,0.15)', color: 'var(--primary-light)' }}>
+                📁 Выбрать файл
+              </button>
+              {formData.photoUrl && (
+                <button type="button" className="remove-btn" onClick={() => setFormData(prev => ({ ...prev, photoUrl: '' }))}>✕</button>
+              )}
+            </div>
+            <input ref={photoFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoFileChange} />
+            {formData.photoUrl && (
+              <div style={{ marginTop: '10px' }}>
+                <img src={formData.photoUrl} alt="preview" style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '10px', border: '2px solid rgba(139,92,246,0.3)' }} />
+              </div>
+            )}
           </div>
 
           <div className="form-group">
-            <label>URL видео (YouTube или прямая ссылка)</label>
-            <input
-              type="url"
-              name="videoUrl"
-              value={formData.videoUrl}
-              onChange={handleChange}
-              placeholder="https://youtube.com/watch?v=..."
-            />
+            <label>Видео (YouTube-ссылка или файл с компьютера)</label>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                name="videoUrl"
+                value={formData.videoUrl.startsWith('data:') ? '(загружено с компьютера)' : formData.videoUrl}
+                onChange={e => setFormData(prev => ({ ...prev, videoUrl: e.target.value }))}
+                placeholder="https://youtube.com/watch?v=... или выберите файл"
+                style={{ flex: 1, minWidth: '200px' }}
+                readOnly={formData.videoUrl.startsWith('data:')}
+              />
+              <button type="button" className="add-btn" onClick={() => videoFileRef.current?.click()}
+                style={{ whiteSpace: 'nowrap', background: 'rgba(139,92,246,0.15)', color: 'var(--primary-light)' }}>
+                🎬 Выбрать файл
+              </button>
+              {formData.videoUrl && (
+                <button type="button" className="remove-btn" onClick={() => setFormData(prev => ({ ...prev, videoUrl: '' }))}>✕</button>
+              )}
+            </div>
+            <input ref={videoFileRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={handleVideoFileChange} />
+            {formData.videoUrl && formData.videoUrl.startsWith('data:video') && (
+              <div style={{ marginTop: '10px' }}>
+                <video src={formData.videoUrl} controls style={{ width: '100%', maxHeight: '200px', borderRadius: '10px' }} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -311,12 +422,45 @@ const TrainerProfileEdit = () => {
                 <option value="video">Видео</option>
               </select>
               <input
-                type="url"
-                value={item.url}
+                type="text"
+                value={item.url.startsWith('data:') ? '(загружено)' : item.url}
                 onChange={(e) => updateGalleryItem(index, 'url', e.target.value)}
-                placeholder="URL"
+                placeholder="URL или выберите файл"
+                readOnly={item.url.startsWith('data:')}
+                style={{ flex: 1 }}
+              />
+              <button 
+                type="button" 
+                className="add-btn"
+                onClick={() => {
+                  if (!galleryFileRefs.current[index]) {
+                    galleryFileRefs.current[index] = React.createRef();
+                  }
+                  galleryFileRefs.current[index].click();
+                }}
+                style={{ whiteSpace: 'nowrap', background: 'rgba(139,92,246,0.15)', color: 'var(--primary-light)' }}
+              >
+                📁 Файл
+              </button>
+              <input
+                ref={(ref) => {
+                  if (ref) galleryFileRefs.current[index] = ref;
+                }}
+                type="file"
+                accept={item.type === 'image' ? 'image/*' : 'video/*'}
+                style={{ display: 'none' }}
+                onChange={(e) => handleGalleryFileChange(e, index)}
               />
               <button type="button" className="remove-btn" onClick={() => removeGalleryItem(index)}>✕</button>
+              {item.url && item.url.startsWith('data:') && (
+                <div style={{ width: '100%', marginTop: '10px' }}>
+                  {item.type === 'image' ? (
+                    <img src={item.url} alt="preview" style={{ maxWidth: '100px', height: 'auto', borderRadius: '8px' }} />
+                  ) : (
+                    <video src={item.url} controls style={{ maxWidth: '200px', height: 'auto', borderRadius: '8px' }} />
+                  )}
+                </div>
+              )}
             </div>
           ))}
           <button type="button" className="add-btn" onClick={addGalleryItem}>+ Добавить в галерею</button>

@@ -7,6 +7,35 @@ const { start } = require('repl');
 const { isatty } = require('tty');
 const { availableMemory } = require('process');
 const e = require('express');
+const crypto = require('crypto');
+
+async function getTrainerRecordByUserId(userId) {
+    return prisma.trainer.findFirst({
+        where: { userId }
+    });
+}
+
+function getDateString(dateObj) {
+    if (!dateObj) return null;
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function getTimeString(dateObj) {
+    if (!dateObj) return null;
+    const hours = String(dateObj.getHours()).padStart(2, '0');
+    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
+
+function combineDateAndTime(dateValue, timeValue) {
+    if (!dateValue || !timeValue) return null;
+    const date = new Date(dateValue);
+    date.setHours(timeValue.getHours(), timeValue.getMinutes(), timeValue.getSeconds() || 0, 0);
+    return date;
+}
 
 class Controler{
 
@@ -815,9 +844,9 @@ class Controler{
             }
             
             let needCheckHall = (hallId && hallId !== existingSchedule.hallId) ||
-                (date && date !== existingSchedule.date.toISOString().split('T')[0]) ||
-                (startTime && startTime !== existingSchedule.startTime.toISOString().split('T')[1].slice(0, 8)) ||
-                (endTime && endTime !== existingSchedule.endTime.toISOString().split('T')[1].slice(0, 8));
+                (date && date !== getDateString(existingSchedule.date)) ||
+                (startTime && startTime !== getTimeString(existingSchedule.startTime)) ||
+                (endTime && endTime !== getTimeString(existingSchedule.endTime));
             
             if (needCheckHall) {
                 let hallSchedule = await prisma.schedule.findFirst({
@@ -854,9 +883,9 @@ class Controler{
             }
             
             let needCheckTrainer = (trainerId && trainerId !== existingSchedule.trainerId) ||
-                (date && date !== existingSchedule.date.toISOString().split('T')[0]) ||
-                (startTime && startTime !== existingSchedule.startTime.toISOString().split('T')[1].slice(0, 8)) ||
-                (endTime && endTime !== existingSchedule.endTime.toISOString().split('T')[1].slice(0, 8));
+                (date && date !== getDateString(existingSchedule.date)) ||
+                (startTime && startTime !== getTimeString(existingSchedule.startTime)) ||
+                (endTime && endTime !== getTimeString(existingSchedule.endTime));
             
             if (needCheckTrainer) {
                 let trainerSchedule = await prisma.schedule.findFirst({
@@ -1092,11 +1121,11 @@ class Controler{
                     }
                     : item.trainer,
                 hall: item.hall,
-                date: item.date.toISOString().split('T')[0],
-                startTime: item.startTime.toISOString().split('T')[1].slice(0, 5),
-                endTime: item.endTime.toISOString().split('T')[1].slice(0, 5),
+                date: getDateString(item.date),
+                startTime: getTimeString(item.startTime),
+                endTime: getTimeString(item.endTime),
                 maxCapacity: item.maxCapacity,
-                currentBookings: item.currentBookings,
+                currentBookings: item._count?.bookings ?? item.currentBookings,
                 bookingsCount: item._count?.bookings,
                 status: item.status,
                 cancellationReason: item.cancellationReason
@@ -2154,10 +2183,13 @@ class Controler{
                 });
             }
 
-            if(role === 'trainer' && schedule.trainerId !== userId){
-                return res.status(403).json({
-                    error: 'Вы можете просматривать записи только на свои занятия'
-                });
+            if(role === 'trainer'){
+                const trainerRecord = await getTrainerRecordByUserId(userId);
+                if(!trainerRecord || schedule.trainerId !== trainerRecord.id){
+                    return res.status(403).json({
+                        error: 'Вы можете просматривать записи только на свои занятия'
+                    });
+                }
             }
 
             if (schedule?.trainer?.user) {
@@ -2308,9 +2340,7 @@ class Controler{
             }
 
             let now = new Date();
-            let scheduleDateTime = new Date(schedule.date);
-            let [startHour, startMinute] = schedule.startTime.toISOString().split('T')[1].split(':');
-            scheduleDateTime.setHours(parseInt(startHour), parseInt(startMinute));
+            let scheduleDateTime = combineDateAndTime(schedule.date, schedule.startTime);
 
             if(scheduleDateTime < now){
                 return res.status(400).json({
@@ -2410,7 +2440,9 @@ class Controler{
                     clientId: userId,
                     membershipId: selectedMembershipId,
                     status: 'booked',
-                    bookingTime: new Date()
+                    bookingTime: new Date(),
+                    qrCode: crypto.randomBytes(16).toString('hex'),
+                    qrCodeGenerated: new Date()
                 },
                 include: {
                     schedule: {
@@ -2526,7 +2558,14 @@ class Controler{
 
             let isOwner = booking.clientId === userId;
             let isAdmin = role === 'admin';
-            let isTrainer = role === 'trainer' && booking.schedule.trainerId === userId;
+            let isTrainer = false;
+
+            if(role === 'trainer'){
+                const trainerRecord = await getTrainerRecordByUserId(userId);
+                if(trainerRecord){
+                    isTrainer = booking.schedule.trainerId === trainerRecord.id;
+                }
+            }
 
             if(!isOwner && !isAdmin && !isTrainer){
                 return res.status(403).json({
@@ -2541,9 +2580,7 @@ class Controler{
             }
 
             let now = new Date();
-            let scheduleDateTime = new Date(booking.schedule.date);
-            let [startHour, startMinute] = booking.schedule.startTime.toISOString().split('T')[1].split(':');
-            scheduleDateTime.setHours(parseInt(startHour), parseInt(startMinute));
+            let scheduleDateTime = combineDateAndTime(booking.schedule.date, booking.schedule.startTime);
 
             if(isOwner && !isAdmin){
                 let hoursBeforeStart = (scheduleDateTime - now) / (1000 * 60 * 60);
@@ -2642,8 +2679,16 @@ class Controler{
                 });
             }
 
-            let isTrainer = booking.schedule.trainerId === userId;
+            let trainerRecord = null;
+            let isTrainer = false;
             let isAdmin = role === 'admin';
+
+            if(role === 'trainer'){
+                trainerRecord = await getTrainerRecordByUserId(userId);
+                if(trainerRecord){
+                    isTrainer = booking.schedule.trainerId === trainerRecord.id;
+                }
+            }
 
             if(!isTrainer && !isAdmin){
                 return res.status(403).json({
@@ -2671,19 +2716,29 @@ class Controler{
             
             let now = new Date();
             let scheduleDateTime = new Date(booking.schedule.date);
-            let [startHour, startMinute] = booking.schedule.startTime.toISOString().split('T')[1].split(':');
-            scheduleDateTime.setHours(parseInt(startHour), parseInt(startMinute));
-
-            let [endHour, endMinute] = booking.schedule.endTime.toISOString().split('T')[1].split(':');
+            scheduleDateTime.setHours(
+                booking.schedule.startTime.getHours(),
+                booking.schedule.startTime.getMinutes(),
+                booking.schedule.startTime.getSeconds() || 0,
+                0
+            );
             let endDateTime = new Date(booking.schedule.date);
-            endDateTime.setHours(parseInt(endHour), parseInt(endMinute));
+            endDateTime.setHours(
+                booking.schedule.endTime.getHours(),
+                booking.schedule.endTime.getMinutes(),
+                booking.schedule.endTime.getSeconds() || 0,
+                0
+            );
 
-            if(endDateTime < now){
+            const earlyMarkWindowMinutes = 15;
+            let earliestMarkTime = new Date(scheduleDateTime);
+            earliestMarkTime.setMinutes(earliestMarkTime.getMinutes() - earlyMarkWindowMinutes);
 
-            }
-            else if(scheduleDateTime > now){
+            if (endDateTime < now) {
+                // Уже прошло, можно отмечать.
+            } else if (scheduleDateTime > now && now < earliestMarkTime) {
                 return res.status(400).json({
-                    error: 'Нельзя отметить посещение до начала занятия'
+                    error: `Нельзя отметить посещение до начала занятия. Можно отмечать за ${earlyMarkWindowMinutes} минут до старта.`
                 });
             }
 
@@ -2692,12 +2747,11 @@ class Controler{
             let updatedBooking = await prisma.booking.update({
                 where: {id},
                 data: {
-                    status: newStatus,
-                    attendedAt: attended ? new Date() : null
+                    status: newStatus
                 }
             });
 
-            if(!attended && booking.membership.membershipType.visitCount !== null &&
+            if(!attended && booking.membership && booking.membership.membershipType && booking.membership.membershipType.visitCount !== null &&
                 booking.membership.remainingVisits !== null
             ){
                 await prisma.membership.update({
@@ -2725,7 +2779,7 @@ class Controler{
             });
 
             res.json({
-                succes: true,
+                success: true,
                 message: attended ? 'Посещение отмечено' : 'Клиент отмечен как не пришедший',
                 booking: {
                     id: updatedBooking.id,
@@ -2761,8 +2815,36 @@ class Controler{
             if(role === 'client'){
                 where.clientId = userId;
             } else if(role === 'trainer'){
+                const trainerRecord = await getTrainerRecordByUserId(userId);
+                if(!trainerRecord){
+                    return res.status(403).json({
+                        error: 'Недостаточно прав для просмотра истории'
+                    });
+                }
                 where.schedule = {
-                    trainerId: userId
+                    trainerId: trainerRecord.id
+                };
+            }
+
+            if(role !== 'admin'){
+                if(!where.schedule){
+                    where.schedule = {};
+                }
+                const now = new Date();
+                const today = new Date(now);
+                today.setHours(0, 0, 0, 0);
+                const timeOnly = new Date(0);
+                timeOnly.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0);
+
+                where.schedule = {
+                    ...where.schedule,
+                    OR: [
+                        { date: { lt: today } },
+                        {
+                            date: today,
+                            startTime: { lte: timeOnly }
+                        }
+                    ]
                 };
             }
 
@@ -2862,9 +2944,9 @@ class Controler{
                     id: booking.membership.id,
                     typeName: booking.membership.membershipType.name
                 },
-                attendanceLog: booking.attendanceLog ? {
-                    markedAt: booking.attendanceLog.markedAt,
-                    markedBy: booking.attendanceLog.trainer.fullName,
+                attendanceLog: booking.attendanceLogs?.[0] ? {
+                    markedAt: booking.attendanceLogs[0].markedAt,
+                    markedBy: booking.attendanceLogs[0].trainer?.fullName,
                 } : null,
                 historyStatus: booking.history?.status  // из таблицы bookinghistory
             }));
@@ -3692,11 +3774,13 @@ class Controler{
     async completePassedSchedules(req, res) {
         try {
             const now = new Date();
+            const today = new Date(now);
+            today.setHours(0, 0, 0, 0);
             // Находим все занятия со статусом scheduled, дата которых уже прошла
             const result = await prisma.schedule.updateMany({
                 where: {
                     status: 'scheduled',
-                    date: { lt: new Date(now.toISOString().split('T')[0]) }
+                    date: { lt: today }
                 },
                 data: { status: 'completed' }
             });
@@ -3901,6 +3985,25 @@ class Controler{
             res.json({ success: true, count: result[0]?.count || 0 });
         } catch (error) {
             console.error('getUnreadCount error:', error);
+            res.status(500).json({ error: 'Ошибка' });
+        }
+    }
+
+    // Количество непрочитанных сообщений от конкретного контакта
+    async getUnreadCountForContact(req, res) {
+        try {
+            const { id: userId } = req.user;
+            const { contactId } = req.params;
+            const result = await prisma.$queryRaw`
+                SELECT COUNT(*)::int as count
+                FROM messages
+                WHERE senderid = ${contactId}::uuid
+                  AND receiverid = ${userId}::uuid
+                  AND isread = false
+            `;
+            res.json({ success: true, count: result[0]?.count || 0 });
+        } catch (error) {
+            console.error('getUnreadCountForContact error:', error);
             res.status(500).json({ error: 'Ошибка' });
         }
     }

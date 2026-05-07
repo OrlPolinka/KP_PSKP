@@ -48,6 +48,28 @@ const TrainingInfo = () => {
     }
   };
 
+  const getYouTubeEmbedUrl = (url) => {
+    if (!url) return '';
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes('youtu.be')) {
+        const id = u.pathname.split('/').filter(Boolean)[0];
+        return id ? `https://www.youtube.com/embed/${id}` : url;
+      }
+      if (u.hostname.includes('youtube.com')) {
+        if (u.pathname.includes('/shorts/')) {
+          const id = u.pathname.split('/shorts/')[1]?.split('/')[0];
+          return id ? `https://www.youtube.com/embed/${id}` : url;
+        }
+        const id = u.searchParams.get('v');
+        return id ? `https://www.youtube.com/embed/${id}` : url;
+      }
+      return url;
+    } catch {
+      return url;
+    }
+  };
+
   const filteredInfo = activeCategory === 'all' 
     ? info 
     : info.filter(item => item.category === activeCategory);
@@ -117,7 +139,7 @@ const TrainingInfo = () => {
                       <div className="info-video">
                         {item.videoUrl.includes('youtube.com') || item.videoUrl.includes('youtu.be') ? (
                           <iframe
-                            src={item.videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                            src={getYouTubeEmbedUrl(item.videoUrl)}
                             title={item.title}
                             frameBorder="0"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

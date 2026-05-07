@@ -65,8 +65,8 @@ const Sidebar = () => {
       case 'trainer':
         return [
           { path: '/trainer/schedule', icon: '📅', label: 'Моё расписание' },
-          { path: '/trainer/my-classes', icon: '🗓️', label: 'Мои занятия' },
           { path: '/trainer/classes', icon: '✅', label: 'Посещаемость' },
+          { path: '/trainer/qr-scanner', icon: '📱', label: 'Сканер QR' },
           { path: '/trainer/profile', icon: '👤', label: 'Мой профиль' },
           { path: '/chat', icon: '💬', label: 'Чат', badge: unreadTotal },
         ];
@@ -74,6 +74,7 @@ const Sidebar = () => {
         return [
           { path: '/schedule', icon: '📅', label: 'Расписание' },
           { path: '/my-bookings', icon: '📝', label: 'Мои записи' },
+          { path: '/qr-codes', icon: '📱', label: 'QR-коды' },
           { path: '/my-memberships', icon: '💳', label: 'Абонементы' },
           { path: '/trainers', icon: '🧑‍🏫', label: 'Тренеры' },
           { path: '/dance-styles', icon: '💃', label: 'Стили танцев' },

@@ -1,0 +1,183 @@
+import React, { useState, useEffect } from 'react';
+import { Calendar, Clock, MapPin, User, CheckCircle, RefreshCw, Sparkles } from 'lucide-react';
+import api from '../services/api';
+
+const TodayQRCodes = () => {
+    const [qrCodes, setQrCodes] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    const fetchTodayQRCodes = async () => {
+        setLoading(true);
+        setError(null);
+        
+        try {
+            const response = await api.get('/bookings/today/qrcodes');
+            setQrCodes(response.data.qrCodes);
+        } catch (err) {
+            setError(err.response?.data?.error || 'Ошибка при загрузке QR-кодов');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchTodayQRCodes();
+    }, []);
+
+    const getStatusBadge = (status, checkedIn) => {
+        if (checkedIn) {
+            return (
+                <div className="badge badge-success">
+                    <CheckCircle size={12} className="me-1" />
+                    Отмечен
+                </div>
+            );
+        }
+        if (status === 'attended') {
+            return (
+                <div className="badge badge-success">
+                    <CheckCircle size={12} className="me-1" />
+                    Посещено
+                </div>
+            );
+        }
+        if (status === 'booked') {
+            return <div className="badge badge-purple">Забронировано</div>;
+        }
+        return <div className="badge badge-secondary">{status}</div>;
+    };
+
+    if (loading) {
+        return (
+            <div className="qr-loading">
+                <div className="qr-spinner"></div>
+                <p>Загрузка QR-кодов...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="alert alert-error">
+                <div>
+                    <strong>Ошибка</strong>
+                    <p>{error}</p>
+                    <button className="btn btn-danger" onClick={fetchTodayQRCodes}>
+                        Попробовать снова
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div>
+            {/* Header with refresh button */}
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h3 className="page-title mb-2">
+                        <Calendar className="me-3" />
+                        QR-коды на сегодня
+                    </h3>
+                    <p className="page-subtitle">
+                        {new Date().toLocaleDateString('ru-RU', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                        })}
+                    </p>
+                </div>
+                <button 
+                    className="btn btn-ghost"
+                    onClick={fetchTodayQRCodes}
+                    disabled={loading}
+                >
+                    <RefreshCw size={18} className={loading ? 'spin' : ''} />
+                </button>
+            </div>
+
+            {qrCodes.length === 0 ? (
+                <div className="qr-empty-state">
+                    <Calendar className="qr-empty-state-icon" />
+                    <h3 className="qr-empty-state-title">На сегодня нет занятий</h3>
+                    <p className="qr-empty-state-text">
+                        У вас нет запланированных занятий на сегодня
+                    </p>
+                </div>
+            ) : (
+                <div className="qr-grid">
+                    {qrCodes.map((qrCode) => (
+                        <div 
+                            className="qr-card"
+                            key={qrCode.bookingId}
+                        >
+                            <div className="qr-card-header">
+                                <div>
+                                    <div className="qr-dance-style">
+                                        {qrCode.schedule.danceStyle}
+                                    </div>
+                                    <div className="qr-status">
+                                        {getStatusBadge(qrCode.status, qrCode.checkedIn)}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="qr-info">
+                                <div className="qr-info-item">
+                                    <Clock size={16} />
+                                    {qrCode.schedule.startTime} - {qrCode.schedule.endTime}
+                                </div>
+                                
+                                <div className="qr-info-item">
+                                    <User size={16} />
+                                    {qrCode.schedule.trainer}
+                                </div>
+                                
+                                <div className="qr-info-item">
+                                    <MapPin size={16} />
+                                    {qrCode.schedule.hall}
+                                </div>
+                            </div>
+                            
+                            <div className="qr-preview">
+                                <img 
+                                    src={qrCode.qrImage} 
+                                    alt="QR-код" 
+                                    style={{ 
+                                        opacity: qrCode.checkedIn ? 0.5 : 1,
+                                        filter: qrCode.checkedIn ? 'grayscale(100%)' : 'none'
+                                    }}
+                                />
+                            </div>
+                            
+                            <div className="qr-download-btn">
+                                <a 
+                                    href={`/api/bookings/${qrCode.bookingId}/qrcode/download`}
+                                    download={`qr-code-${qrCode.bookingId}.png`}
+                                    className="btn btn-primary"
+                                    disabled={qrCode.checkedIn}
+                                >
+                                    {qrCode.checkedIn ? (
+                                        <>
+                                            <CheckCircle size={16} />
+                                            Посещение отмечено
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles size={16} />
+                                            Скачать QR-код
+                                        </>
+                                    )}
+                                </a>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default TodayQRCodes;

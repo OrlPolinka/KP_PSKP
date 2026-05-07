@@ -55,3 +55,31 @@ docker-compose up --build
 docker-compose up --build --no-deps frontend
 docker-compose up --build --no-deps nginx
 docker-compose up --build --no-deps backend
+
+
+# 1) Обычный запуск БЕЗ пересида (данные сохраняются)
+docker compose up -d
+# 2) Разовый пересид (очистить и заново заполнить тестовыми данными)
+# Linux/macOS:
+SEED_ON_START=true docker compose up -d --build backend
+# Windows PowerShell:
+$env:SEED_ON_START="true"; docker compose up -d --build backend; Remove-Item Env:\SEED_ON_START
+# 3) Пересобрать ТОЛЬКО фронт и перезапустить только его контейнер
+docker compose up -d --build frontend
+# (опционально) Если нужно после изменения фронта перезапустить nginx
+docker compose restart nginx
+# Полезно проверить, что backend стартовал без seed:
+docker compose logs backend --tail=100
+# Должно быть: "SEED_ON_START is not true, skipping s
+
+
+
+Если вы собираете и запускаете заново:
+docker-compose build backend frontend
+docker-compose up -d backend frontend nginx
+up -d сам поднимет новые контейнеры и заменит старые, если образы изменились.
+
+
+Когда останавливать вручную
+Только если хотите полностью очистить старые контейнеры/тома:
+docker-compose down

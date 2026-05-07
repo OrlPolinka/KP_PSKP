@@ -32,6 +32,12 @@ export const scheduleService = {
     return response.data;
   },
 
+  // Отменить занятие тренером
+  cancelScheduleByTrainer: async (id, reason = '') => {
+    const response = await api.put(`/schedule/${id}/cancel-by-trainer`, { reason });
+    return response.data;
+  },
+
   // Получить залы
   getHalls: async () => {
     const response = await api.get('/halls');

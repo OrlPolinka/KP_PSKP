@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../services/api';
 import './TrainerProfile.css';
@@ -9,22 +9,28 @@ const TrainerProfile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchTrainer();
-  }, [id]);
-
-  const fetchTrainer = async () => {
+  const fetchTrainer = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await api.get(`/public/trainers/${id}`);
-      setTrainer(response.data.trainer);
+      if (response.data && response.data.trainer) {
+        setTrainer(response.data.trainer);
+      } else {
+        setError('Тренер не найден');
+      }
     } catch (err) {
-      console.error('Ошибка при загрузке тренера:', err);
-      setError('Не удалось загрузить профиль тренера');
+      setError(err.response?.data?.error || 'Ошибка при загрузке тренера');
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      fetchTrainer();
+    }
+  }, [id, fetchTrainer]);
 
   if (loading) {
     return (

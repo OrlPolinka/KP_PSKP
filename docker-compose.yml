@@ -36,6 +36,7 @@ services:
       context: ./frontend
       args:
         - REACT_APP_API_URL=/api
+      shm_size: 1gb
     container_name: dance_studio_frontend
     depends_on:
       - backend

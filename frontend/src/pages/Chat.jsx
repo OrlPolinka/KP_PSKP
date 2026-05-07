@@ -161,10 +161,15 @@ const Chat = () => {
   // Контекстное меню сообщения
   const [msgMenu, setMsgMenu] = useState(null); // { msgId, x, y }
 
-  const messagesEndRef = useRef(null);
+  // При открытии страницы чата — сбрасываем счётчик
+  useEffect(() => {
+    resetUnread(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const inputRef = useRef(null);
   const editInputRef = useRef(null);
   const typingTimerRef = useRef(null);
+  const messagesEndRef = useRef(null);
   const isMobile = window.innerWidth < 768;
   const [showContacts, setShowContacts] = useState(true);
 
@@ -229,6 +234,11 @@ const Chat = () => {
 
   useEffect(() => { fetchContacts(); }, [fetchContacts]);
 
+  useEffect(() => {
+    if (!loadingContacts) return;
+    resetUnread(0);
+  }, [loadingContacts, resetUnread]);
+
   // Открыть чат по URL
   useEffect(() => {
     if (!urlUserId || loadingContacts) return;
@@ -237,9 +247,17 @@ const Chat = () => {
     api.get(`/users/${urlUserId}`).then(res => {
       const u = res.data?.user;
       if (u) {
-        const nc = { id: u.id, fullName: u.fullName, photoUrl: u.photoUrl, role: u.role, isActive: u.isActive, unreadCount: 0, lastMessage: null };
-        setContacts(prev => prev.some(c => c.id === u.id) ? prev : [nc, ...prev]);
-        selectContact(nc);
+        // Загружаем актуальный unreadCount для контакта
+        api.get(`/chat/unread-for-contact/${u.id}`).then(unreadRes => {
+          const unreadCount = unreadRes.data?.count || 0;
+          const nc = { id: u.id, fullName: u.fullName, photoUrl: u.photoUrl, role: u.role, isActive: u.isActive, unreadCount, lastMessage: null };
+          setContacts(prev => prev.some(c => c.id === u.id) ? prev : [nc, ...prev]);
+          selectContact(nc);
+        }).catch(() => {
+          const nc = { id: u.id, fullName: u.fullName, photoUrl: u.photoUrl, role: u.role, isActive: u.isActive, unreadCount: 0, lastMessage: null };
+          setContacts(prev => prev.some(c => c.id === u.id) ? prev : [nc, ...prev]);
+          selectContact(nc);
+        });
       }
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -323,7 +341,7 @@ const Chat = () => {
       const res = await api.get(`/chat/history/${contact.id}`);
       setMessages(res.data.messages || []);
       socketService.markRead(contact.id);
-      resetUnread(contact.unreadCount || 0);
+      resetUnread(0); // refresh the badge after messages are marked read on the server
       setContacts(prev => prev.map(c => c.id === contact.id ? { ...c, unreadCount: 0 } : c));
     } catch (err) {
       console.error('getChatHistory error:', err);

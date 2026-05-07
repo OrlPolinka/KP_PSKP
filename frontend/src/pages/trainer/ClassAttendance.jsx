@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { scheduleService } from '../../services/scheduleService';
 import { bookingService } from '../../services/bookingService';
-import { formatDate, formatTime, isToday, isPastDate } from '../../utils/dateHelpers';
+import { formatDate, formatTime, isToday, isPastDateTime } from '../../utils/dateHelpers';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 
@@ -14,6 +14,9 @@ const ClassAttendance = () => {
   const [bookingsLoading, setBookingsLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [filter, setFilter] = useState('today');
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [qrScanResult, setQrScanResult] = useState(null);
+  const [qrScanLoading, setQrScanLoading] = useState(false);
 
   useEffect(() => {
     fetchSchedule();
@@ -56,10 +59,41 @@ const ClassAttendance = () => {
     }
   };
 
+  const handleQRScan = async (qrCode) => {
+    try {
+      setQrScanLoading(true);
+      const response = await api.post('/bookings/verify-qrcode', { qrCode });
+      
+      if (response.data.valid) {
+        setQrScanResult({
+          success: true,
+          booking: response.data.booking,
+          message: `✅ Клиент ${response.data.booking.client.fullName} подтверждён`
+        });
+        
+        // Автоматически отмечаем посещение
+        await handleMarkAttendance(response.data.booking.id, true);
+        setTimeout(() => {
+          setShowQRScanner(false);
+          setQrScanResult(null);
+        }, 2000);
+      }
+    } catch (error) {
+      setQrScanResult({
+        success: false,
+        message: error.response?.data?.error || 'Ошибка при проверке QR-кода'
+      });
+    } finally {
+      setQrScanLoading(false);
+    }
+  };
+
   const filteredSchedule = schedule.filter(item => {
-    if (filter === 'today') return isToday(item.date);
-    if (filter === 'past') return isPastDate(item.date) && !isToday(item.date);
-    return !isPastDate(item.date) || isToday(item.date);
+    const past = isPastDateTime(item.date, item.endTime);
+    const today = isToday(item.date);
+    if (filter === 'today') return today && !past;
+    if (filter === 'past') return past;
+    return !past;
   }).sort((a, b) => {
     const dateA = new Date(`${a.date}T${a.startTime || '00:00'}`);
     const dateB = new Date(`${b.date}T${b.startTime || '00:00'}`);
@@ -84,7 +118,7 @@ const ClassAttendance = () => {
           <div className="page-header">
             <div>
               <h1 className="page-title">Посещаемость</h1>
-              <p className="page-subtitle">Отметь присутствие студентов</p>
+              <p className="page-subtitle">Отметь присутствие клиентов</p>
             </div>
           </div>
 
@@ -116,7 +150,7 @@ const ClassAttendance = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {filteredSchedule.map(item => {
                 const today = isToday(item.date);
-                const past = isPastDate(item.date) && !today;
+                const past = isPastDateTime(item.date, item.endTime);
                 return (
                   <div
                     key={item.id}
@@ -211,6 +245,14 @@ const ClassAttendance = () => {
                 🏛️ {selectedSchedule.hall?.name}
               </p>
             </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => setShowQRScanner(true)}
+              >
+                📱 Сканировать QR-код
+              </button>
+            </div>
           </div>
 
           {message && (
@@ -260,7 +302,7 @@ const ClassAttendance = () => {
                 <table>
                   <thead>
                     <tr>
-                      <th>Студент</th>
+                      <th>Клиент</th>
                       <th>Телефон</th>
                       <th>Статус</th>
                       <th>Действия</th>
@@ -353,7 +395,95 @@ const ClassAttendance = () => {
           )}
         </>
       )}
-    </div>
+      {/* QR Scanner Modal */}
+      {showQRScanner && (
+        <div className="modal-overlay" onClick={() => setShowQRScanner(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>📱 Сканирование QR-кода</h3>
+              <button 
+                className="close-btn"
+                onClick={() => setShowQRScanner(false)}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="modal-body" style={{ textAlign: 'center', padding: '40px' }}>
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ 
+                  width: '300px', 
+                  height: '300px', 
+                  border: '2px dashed #A78BFA',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 20px',
+                  background: 'rgba(167, 139, 250, 0.1)'
+                }}>
+                  <div style={{ textAlign: 'center', color: '#A78BFA' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '10px' }}>📱</div>
+                    <div>Наведите камеру на QR-код клиента</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <input
+                  type="text"
+                  placeholder="Или введите QR-код вручную..."
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    textAlign: 'center'
+                  }}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleQRScan(e.target.value);
+                    }
+                  }}
+                />
+              </div>
+
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  const input = document.querySelector('input[placeholder*="QR-код"]');
+                  if (input && input.value) {
+                    handleQRScan(input.value);
+                  }
+                }}
+                disabled={qrScanLoading}
+                style={{ width: '200px' }}
+              >
+                {qrScanLoading ? '🔄 Проверка...' : '✅ Проверить'}
+              </button>
+
+              {qrScanResult && (
+                <div style={{ 
+                  marginTop: '20px',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  background: qrScanResult.success ? '#10B981' : '#EF4444',
+                  color: 'white'
+                }}>
+                  {qrScanResult.message}
+                  {qrScanResult.success && qrScanResult.booking && (
+                    <div style={{ marginTop: '10px', fontSize: '14px' }}>
+                      <strong>{qrScanResult.booking.client.fullName}</strong><br/>
+                      {qrScanResult.booking.client.phone}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}    </div>
   );
 };
 

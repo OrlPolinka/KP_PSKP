@@ -119,6 +119,7 @@ const routes = [
     {method: 'get',                path: '/chat/search',                           action: 'searchChatUsers'},
     {method: 'get',                path: '/chat/history/:userId',                  action: 'getChatHistory'},
     {method: 'get',                path: '/chat/unread',                           action: 'getUnreadCount'},
+    {method: 'get',                path: '/chat/unread-for-contact/:contactId',    action: 'getUnreadCountForContact'},
     {method: 'put',                path: '/chat/messages/:messageId',              action: 'editMessage'},
     {method: 'delete',             path: '/chat/messages/:messageId',              action: 'deleteMessage'},
     {method: 'delete',             path: '/chat/dialog/:userId',                   action: 'deleteDialog'},
@@ -143,7 +144,11 @@ const routes = [
     
     // QR-коды для посещений
     {method: 'get',                path: '/bookings/:bookingId/qrcode',            handler: newControllers.generateBookingQRCode},
+    {method: 'get',                path: '/bookings/:bookingId/qrcode/download',    handler: newControllers.downloadQRCode},
+    {method: 'get',                path: '/bookings/today/qrcodes',                handler: newControllers.getTodayQRCodes},
+    {method: 'get',                path: '/bookings/all/qrcodes',                   handler: newControllers.getAllQRCodes},
     {method: 'post',               path: '/bookings/verify-qrcode',                handler: newControllers.verifyBookingQRCode},
+    {method: 'post',               path: '/bookings/mark-attendance-by-qr',        handler: newControllers.markAttendanceByQRCode},
     
     // Уведомления
     {method: 'get',                path: '/notifications',                         handler: newControllers.getNotifications},

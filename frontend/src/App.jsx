@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ChatProvider } from './context/ChatContext';
@@ -23,12 +23,13 @@ import TrainerProfile from './pages/client/TrainerProfile';
 import DanceStyles from './pages/client/DanceStyles';
 import TrainingInfo from './pages/client/TrainingInfo';
 import MyBookingsQR from './pages/client/MyBookingsQR';
+import QRCodesPage from './pages/client/QRCodesPage';
 
 // Trainer Pages
 import TrainerSchedule from './pages/trainer/TrainerSchedule';
 import ClassAttendance from './pages/trainer/ClassAttendance';
-import MyClasses from './pages/trainer/MyClasses';
 import TrainerProfileEdit from './pages/trainer/TrainerProfileEdit';
+import QRScannerPage from './pages/trainer/QRScannerPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -72,18 +73,19 @@ const AppRoutes = () => {
           <Route path="/schedule" element={<RoleRoute allowedRoles={['client', 'admin', 'trainer']}><Schedule /></RoleRoute>} />
           <Route path="/my-bookings" element={<RoleRoute allowedRoles={['client']}><MyBookings /></RoleRoute>} />
           <Route path="/my-qr-codes" element={<RoleRoute allowedRoles={['client']}><MyBookingsQR /></RoleRoute>} />
+          <Route path="/qr-codes" element={<RoleRoute allowedRoles={['client']}><QRCodesPage /></RoleRoute>} />
           <Route path="/my-memberships" element={<RoleRoute allowedRoles={['client']}><MyMemberships /></RoleRoute>} />
           <Route path="/history" element={<RoleRoute allowedRoles={['client']}><History /></RoleRoute>} />
-          <Route path="/trainers" element={<RoleRoute allowedRoles={['client']}><Trainers /></RoleRoute>} />
-          <Route path="/trainers/:id" element={<RoleRoute allowedRoles={['client']}><TrainerProfile /></RoleRoute>} />
+          <Route path="/trainers" element={<Trainers />} />
+          <Route path="/trainers/:id" element={<TrainerProfile />} />
           <Route path="/dance-styles" element={<RoleRoute allowedRoles={['client']}><DanceStyles /></RoleRoute>} />
           <Route path="/training-info" element={<RoleRoute allowedRoles={['client']}><TrainingInfo /></RoleRoute>} />
 
           {/* Trainer Routes */}
           <Route path="/trainer/schedule" element={<RoleRoute allowedRoles={['trainer', 'admin']}><TrainerSchedule /></RoleRoute>} />
           <Route path="/trainer/classes" element={<RoleRoute allowedRoles={['trainer', 'admin']}><ClassAttendance /></RoleRoute>} />
-          <Route path="/trainer/my-classes" element={<RoleRoute allowedRoles={['trainer', 'admin']}><MyClasses /></RoleRoute>} />
           <Route path="/trainer/profile" element={<RoleRoute allowedRoles={['trainer']}><TrainerProfileEdit /></RoleRoute>} />
+          <Route path="/trainer/qr-scanner" element={<RoleRoute allowedRoles={['trainer', 'admin']}><QRScannerPage /></RoleRoute>} />
 
           {/* Admin Routes */}
           <Route path="/admin/dashboard" element={<RoleRoute allowedRoles={['admin']}><AdminDashboard /></RoleRoute>} />

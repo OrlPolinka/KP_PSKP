@@ -1,11 +1,16 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
+# Увеличиваем лимит памяти для Node.js
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 COPY package*.json ./
 RUN npm ci
 COPY . .
 # REACT_APP_API_URL будет подставлен через build arg
 ARG REACT_APP_API_URL=/api
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
+# Устанавливаем переменные для уменьшения потребления памяти
+ENV CI=true
+ENV GENERATE_SOURCEMAP=false
 RUN npm run build
 
 FROM nginx:alpine

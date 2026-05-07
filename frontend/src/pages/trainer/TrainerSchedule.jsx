@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { scheduleService } from '../../services/scheduleService';
 import { useAuth } from '../../context/AuthContext';
-import { formatDate, formatTime, isPastDate, isToday } from '../../utils/dateHelpers';
+import { formatDate, formatTime, isPastDateTime, isToday } from '../../utils/dateHelpers';
 import api from '../../services/api';
 
 const statusConfig = {
@@ -10,7 +10,7 @@ const statusConfig = {
   completed: { label: 'Завершено', badge: 'badge-success', icon: '✅' },
 };
 
-const ScheduleDetailModal = ({ item, onClose }) => {
+const ScheduleDetailModal = ({ item, onClose, onCancel, cancelling }) => {
   if (!item) return null;
   const status = statusConfig[item.status] || statusConfig.scheduled;
   const startTime = formatTime(item.startTime);
@@ -84,8 +84,17 @@ const ScheduleDetailModal = ({ item, onClose }) => {
           </p>
         </div>
 
-        <div className="modal-footer">
+        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
           <button className="btn btn-ghost" onClick={onClose}>Закрыть</button>
+          {item.status === 'scheduled' && (
+            <button
+              className="btn btn-danger"
+              onClick={() => onCancel(item.id)}
+              disabled={cancelling}
+            >
+              {cancelling ? 'Отмена...' : 'Отменить занятие'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -114,12 +123,10 @@ const TrainerSchedule = () => {
   const [filter, setFilter] = useState('upcoming');
   const [selectedItem, setSelectedItem] = useState(null);
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'week'
+  const [message, setMessage] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
 
-  useEffect(() => {
-    fetchSchedule();
-  }, []);
-
-  const fetchSchedule = async () => {
+  const fetchSchedule = useCallback(async () => {
     try {
       // Auto-complete passed schedules
       try { await api.post('/schedule/complete-passed'); } catch {}
@@ -132,20 +139,47 @@ const TrainerSchedule = () => {
       });
       setSchedule(mySchedule);
     } catch (error) {
-      console.error('Ошибка загрузки расписания:', error);
+      console.error('Error fetching schedule:', error);
     } finally {
       setLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchSchedule();
+  }, [fetchSchedule]);
+
+  const handleCancelSchedule = async (scheduleId) => {
+    const reason = window.prompt('Введите причину отмены занятия (необязательно):', 'Отменено тренером');
+    if (reason === null) return;
+
+    try {
+      setCancelling(true);
+      await scheduleService.cancelScheduleByTrainer(scheduleId, reason);
+      setMessage({ type: 'success', text: 'Занятие отменено, уведомления отправлены клиентам.' });
+      setSelectedItem(null);
+      await fetchSchedule();
+    } catch (error) {
+      console.error('Ошибка отмены занятия:', error);
+      setMessage({ type: 'error', text: error.response?.data?.error || 'Не удалось отменить занятие' });
+    } finally {
+      setCancelling(false);
+      window.setTimeout(() => setMessage(null), 4000);
     }
   };
 
   const filteredSchedule = schedule.filter(item => {
-    const past = isPastDate(item.date);
+    const past = isPastDateTime(item.date, item.endTime);
     const today = isToday(item.date);
-    if (filter === 'today') return today;
-    if (filter === 'upcoming') return !past || today;
-    if (filter === 'past') return past && !today;
+    if (filter === 'today') return today && !past;
+    if (filter === 'upcoming') return !past;
+    if (filter === 'past') return past;
     return true;
-  }).sort((a, b) => new Date(a.date) - new Date(b.date));
+  }).sort((a, b) => {
+    const dateA = new Date(`${a.date}T${a.startTime || '00:00'}`);
+    const dateB = new Date(`${b.date}T${b.startTime || '00:00'}`);
+    return dateA - dateB;
+  });
 
   // Group by date for week view
   const groupedByDate = filteredSchedule.reduce((acc, item) => {
@@ -157,11 +191,11 @@ const TrainerSchedule = () => {
 
   const stats = {
     total: schedule.length,
-    upcoming: schedule.filter(i => !isPastDate(i.date)).length,
-    today: schedule.filter(i => isToday(i.date)).length,
+    upcoming: schedule.filter(i => !isPastDateTime(i.date, i.endTime)).length,
+    today: schedule.filter(i => isToday(i.date) && !isPastDateTime(i.date, i.endTime)).length,
     completed: schedule.filter(i =>
       i.status === 'completed' ||
-      (i.status === 'scheduled' && isPastDate(i.date) && !isToday(i.date))
+      (i.status === 'scheduled' && isPastDateTime(i.date, i.endTime))
     ).length,
   };
 
@@ -174,6 +208,11 @@ const TrainerSchedule = () => {
 
   return (
     <div className="container">
+      {message && (
+        <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-error'}`} style={{ marginBottom: '16px' }}>
+          {message.text}
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h1 className="page-title">Моё расписание</h1>
@@ -298,6 +337,8 @@ const TrainerSchedule = () => {
         <ScheduleDetailModal
           item={selectedItem}
           onClose={() => setSelectedItem(null)}
+          onCancel={handleCancelSchedule}
+          cancelling={cancelling}
         />
       )}
     </div>
@@ -305,14 +346,14 @@ const TrainerSchedule = () => {
 };
 
 const ScheduleListItem = ({ item, onClick, compact }) => {
-  const effectiveStatus = (item.status === 'scheduled' && isPastDate(item.date) && !isToday(item.date))
+  const past = isPastDateTime(item.date, item.endTime);
+  const today = isToday(item.date);
+  const effectiveStatus = (item.status === 'scheduled' && past)
     ? 'completed'
     : item.status;
   const status = statusConfig[effectiveStatus] || statusConfig.scheduled;
   const startTime = formatTime(item.startTime);
   const endTime = formatTime(item.endTime);
-  const past = isPastDate(item.date);
-  const today = isToday(item.date);
   const occupancy = item.maxCapacity > 0
     ? Math.round((item.currentBookings / item.maxCapacity) * 100)
     : 0;

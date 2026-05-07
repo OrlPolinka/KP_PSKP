@@ -9,8 +9,7 @@ export const ChatProvider = ({ children }) => {
   const { user } = useAuth();
   const [onlineUsers, setOnlineUsers] = useState(new Set());
   const [unreadTotal, setUnreadTotal] = useState(0);
-  const [newMessageCallbacks, setNewMessageCallbacks] = useState([]);
-
+  
   useEffect(() => {
     if (!user) {
       socketService.disconnect();
@@ -50,7 +49,7 @@ export const ChatProvider = ({ children }) => {
     import('../services/api').then(({ default: api }) => {
       api.get('/chat/unread').then(res => {
         setUnreadTotal(res.data.count || 0);
-      }).catch(() => {});
+      }).catch(() => { setUnreadTotal(0); });
     });
 
     return () => {
@@ -61,11 +60,24 @@ export const ChatProvider = ({ children }) => {
     };
   }, [user]);
 
+  const loadUnread = useCallback(() => {
+    import('../services/api').then(({ default: api }) => {
+      api.get('/chat/unread').then(res => {
+        setUnreadTotal(res.data.count || 0);
+      }).catch(() => { setUnreadTotal(0); });
+    });
+  }, []);
+
   const isOnline = useCallback((userId) => onlineUsers.has(userId), [onlineUsers]);
 
   const resetUnread = useCallback((count = 0) => {
-    setUnreadTotal(prev => Math.max(0, prev - count));
-  }, []);
+    if (count === 0) {
+      // Полный сброс — перезапрашиваем с сервера
+      loadUnread();
+    } else {
+      setUnreadTotal(prev => Math.max(0, prev - count));
+    }
+  }, [loadUnread]);
 
   return (
     <ChatContext.Provider value={{ isOnline, unreadTotal, resetUnread, onlineUsers }}>

@@ -12,6 +12,21 @@ const prisma = require('./prisma');
 const QRCode = require('qrcode');
 const crypto = require('crypto');
 
+function getDateString(dateObj) {
+    if (!dateObj) return null;
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function combineDateAndTime(dateValue, timeValue) {
+    if (!dateValue || !timeValue) return null;
+    const date = new Date(dateValue);
+    date.setHours(timeValue.getHours(), timeValue.getMinutes(), timeValue.getSeconds() || 0, 0);
+    return date;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ПРОФИЛИ ТРЕНЕРОВ (Публичные страницы)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -524,9 +539,7 @@ async function generateBookingQRCode(req, res) {
         }
 
         // Проверяем, что занятие ещё не прошло
-        const scheduleDateTime = new Date(booking.schedule.date);
-        const [startHour, startMinute] = booking.schedule.startTime.toISOString().split('T')[1].split(':');
-        scheduleDateTime.setHours(parseInt(startHour), parseInt(startMinute));
+        const scheduleDateTime = combineDateAndTime(booking.schedule.date, booking.schedule.startTime);
 
         if (scheduleDateTime < new Date()) {
             return res.status(400).json({ error: 'Занятие уже прошло' });
@@ -576,6 +589,92 @@ async function generateBookingQRCode(req, res) {
 }
 
 /**
+ * Получить QR-коды на все сегодняшние занятия клиента
+ */
+async function getTodayQRCodes(req, res) {
+    try {
+        const { id: userId } = req.user;
+        const today = getDateString(new Date());
+
+        const bookings = await prisma.booking.findMany({
+            where: {
+                clientId: userId,
+                schedule: {
+                    date: new Date(today),
+                    status: { not: 'cancelled' }
+                },
+                status: { in: ['booked', 'attended'] }
+            },
+            include: {
+                schedule: {
+                    include: {
+                        danceStyle: true,
+                        trainer: {
+                            include: { user: { select: { fullName: true } } }
+                        },
+                        hall: true
+                    }
+                }
+            },
+            orderBy: {
+                schedule: { startTime: 'asc' }
+            }
+        });
+
+        const qrCodes = [];
+        for (const booking of bookings) {
+            // Генерируем QR-код если его нет
+            let qrCode = booking.qrCode;
+            if (!qrCode) {
+                qrCode = crypto.randomBytes(16).toString('hex');
+                await prisma.booking.update({
+                    where: { id: booking.id },
+                    data: {
+                        qrCode,
+                        qrCodeGenerated: new Date()
+                    }
+                });
+            }
+
+            // Генерируем изображение QR-кода
+            const qrData = JSON.stringify({
+                bookingId: booking.id,
+                qrCode: qrCode,
+                scheduleId: booking.scheduleId,
+                clientId: booking.clientId
+            });
+
+            const qrImage = await QRCode.toDataURL(qrData);
+
+            qrCodes.push({
+                bookingId: booking.id,
+                qrCode: qrCode,
+                qrImage: qrImage,
+                schedule: {
+                    date: booking.schedule.date,
+                    startTime: booking.schedule.startTime,
+                    endTime: booking.schedule.endTime,
+                    danceStyle: booking.schedule.danceStyle.name,
+                    trainer: booking.schedule.trainer?.user?.fullName,
+                    hall: booking.schedule.hall.name
+                },
+                status: booking.status,
+                checkedIn: booking.checkedIn
+            });
+        }
+
+        res.json({
+            success: true,
+            qrCodes,
+            count: qrCodes.length
+        });
+    } catch (error) {
+        console.error('getTodayQRCodes error:', error);
+        res.status(500).json({ error: 'Ошибка при получении QR-кодов' });
+    }
+}
+
+/**
  * Проверка QR-кода (тренером)
  */
 async function verifyBookingQRCode(req, res) {
@@ -618,14 +717,22 @@ async function verifyBookingQRCode(req, res) {
         }
 
         // Проверяем, что занятие сегодня
-        const today = new Date().toISOString().split('T')[0];
-        const scheduleDate = booking.schedule.date.toISOString().split('T')[0];
+        const today = getDateString(new Date());
+        const scheduleDate = getDateString(booking.schedule.date);
 
         if (scheduleDate !== today) {
             return res.status(400).json({
                 error: 'Занятие не сегодня',
                 scheduleDate: scheduleDate,
                 today: today
+            });
+        }
+
+        // Проверяем, что QR-код не был использован
+        if (booking.qrCodeScanned) {
+            return res.status(400).json({ 
+                error: 'QR-код уже был использован',
+                scannedAt: booking.qrCodeScannedAt
             });
         }
 
@@ -643,12 +750,309 @@ async function verifyBookingQRCode(req, res) {
                     hall: booking.schedule.hall
                 },
                 status: booking.status,
-                checkedIn: booking.checkedIn
+                checkedIn: booking.checkedIn,
+                qrCodeScanned: booking.qrCodeScanned
             }
         });
     } catch (error) {
         console.error('verifyBookingQRCode error:', error);
         res.status(500).json({ error: 'Ошибка при проверке QR-кода' });
+    }
+}
+
+/**
+ * Скачать QR-код в формате PNG
+ */
+async function downloadQRCode(req, res) {
+    try {
+        const { bookingId } = req.params;
+        const { id: userId } = req.user;
+
+        const booking = await prisma.booking.findFirst({
+            where: {
+                id: bookingId,
+                clientId: userId
+            },
+            include: {
+                schedule: {
+                    include: {
+                        danceStyle: true
+                    }
+                }
+            }
+        });
+
+        if (!booking) {
+            return res.status(404).json({ error: 'Бронирование не найдено' });
+        }
+
+        if (!booking.qrCode) {
+            return res.status(400).json({ error: 'QR-код не сгенерирован' });
+        }
+
+        // Генерируем QR-код с высоким разрешением
+        const qrCodeDataUrl = await QRCode.toDataURL(booking.qrCode, {
+            width: 300,
+            margin: 2,
+            color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+            }
+        });
+
+        // Конвертируем Data URL в Buffer
+        const base64Data = qrCodeDataUrl.replace(/^data:image\/png;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        // Устанавливаем заголовки для скачивания
+        const danceStyle = booking.schedule.danceStyle.name;
+        const filename = `QR-код_${danceStyle}_${new Date().toISOString().split('T')[0]}.png`;
+        
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+        res.setHeader('Content-Length', buffer.length);
+
+        res.send(buffer);
+    } catch (error) {
+        console.error('downloadQRCode error:', error);
+        res.status(500).json({ error: 'Ошибка при скачивании QR-кода' });
+    }
+}
+
+/**
+ * Получить все QR-коды клиента
+ */
+async function getAllQRCodes(req, res) {
+    try {
+        const { id: userId } = req.user;
+
+        const bookings = await prisma.booking.findMany({
+            where: {
+                clientId: userId,
+                status: { not: 'cancelled' },
+                qrCode: { not: null }
+            },
+            include: {
+                schedule: {
+                    include: {
+                        danceStyle: true,
+                        trainer: {
+                            include: {
+                                user: {
+                                    select: { fullName: true }
+                                }
+                            }
+                        },
+                        hall: true
+                    }
+                }
+            },
+            orderBy: {
+                schedule: {
+                    date: 'asc'
+                }
+            }
+        });
+
+        const qrCodes = bookings.map(booking => {
+            const scheduleDate = new Date(booking.schedule.date);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            // Определяем, можно ли сканировать QR-код
+            const canScan = !booking.qrCodeScanned && 
+                           !booking.checkedIn && 
+                           booking.status !== 'attended' && 
+                           booking.status !== 'no_show' &&
+                           scheduleDate >= today;
+
+            return {
+                bookingId: booking.id,
+                qrCode: booking.qrCode,
+                qrImage: `/api/bookings/${booking.id}/qrcode`,
+                status: booking.status,
+                checkedIn: booking.checkedIn,
+                qrCodeScanned: booking.qrCodeScanned,
+                canScan,
+                schedule: {
+                    date: booking.schedule.date,
+                    startTime: booking.schedule.startTime,
+                    endTime: booking.schedule.endTime,
+                    danceStyle: booking.schedule.danceStyle.name,
+                    trainer: booking.schedule.trainer.user.fullName,
+                    hall: booking.schedule.hall.name
+                }
+            };
+        });
+
+        res.json({
+            success: true,
+            qrCodes
+        });
+    } catch (error) {
+        console.error('getAllQRCodes error:', error);
+        res.status(500).json({ error: 'Ошибка при загрузке QR-кодов' });
+    }
+}
+
+/**
+ * Отметить посещение через QR-код
+ */
+async function markAttendanceByQRCode(req, res) {
+    try {
+        const { qrCode, attended = true, notes } = req.body;
+        const { role, id: userId } = req.user;
+
+        if (role !== 'trainer' && role !== 'admin') {
+            return res.status(403).json({ error: 'Только тренер может отмечать посещения' });
+        }
+
+        const booking = await prisma.booking.findFirst({
+            where: { qrCode },
+            include: {
+                schedule: {
+                    include: {
+                        danceStyle: true,
+                        trainer: true,
+                        hall: true
+                    }
+                },
+                client: {
+                    select: { id: true, fullName: true, email: true, phone: true }
+                },
+                membership: {
+                    include: {
+                        membershipType: true
+                    }
+                }
+            }
+        });
+
+        if (!booking) {
+            return res.status(404).json({ error: 'QR-код не найден' });
+        }
+
+        // Проверяем, что тренер отмечает своё занятие
+        if (role === 'trainer') {
+            const trainerRecord = await prisma.trainer.findFirst({
+                where: { userId }
+            });
+            if (!trainerRecord || booking.schedule.trainerId !== trainerRecord.id) {
+                return res.status(403).json({ error: 'Это не ваше занятие' });
+            }
+        }
+
+        // Проверяем, что занятие сегодня
+        const today = getDateString(new Date());
+        const scheduleDate = getDateString(booking.schedule.date);
+
+        if (scheduleDate !== today) {
+            return res.status(400).json({
+                error: 'Занятие не сегодня',
+                scheduleDate: scheduleDate,
+                today: today
+            });
+        }
+
+        if (booking.status === 'cancelled') {
+            return res.status(400).json({ error: 'Нельзя отметить посещение отмененной записи' });
+        }
+
+        if (booking.status === 'attended') {
+            return res.status(400).json({ error: 'Посещение уже отмечено' });
+        }
+
+        if (booking.status === 'no_show') {
+            return res.status(400).json({ error: 'Клиент уже отмечен как не пришедший' });
+        }
+
+        // Проверяем, что QR-код не был использован
+        if (booking.qrCodeScanned) {
+            return res.status(400).json({ 
+                error: 'QR-код уже был использован',
+                scannedAt: booking.qrCodeScannedAt
+            });
+        }
+
+        // Проверяем время (можно отмечать за 15 минут до начала)
+        const now = new Date();
+        const scheduleDateTime = new Date(booking.schedule.date);
+        scheduleDateTime.setHours(
+            booking.schedule.startTime.getHours(),
+            booking.schedule.startTime.getMinutes(),
+            booking.schedule.startTime.getSeconds() || 0,
+            0
+        );
+        
+        const earlyMarkWindowMinutes = 15;
+        const earliestMarkTime = new Date(scheduleDateTime);
+        earliestMarkTime.setMinutes(earliestMarkTime.getMinutes() - earlyMarkWindowMinutes);
+
+        if (now < earliestMarkTime) {
+            return res.status(400).json({
+                error: `Нельзя отметить посещение до начала занятия. Можно отмечать за ${earlyMarkWindowMinutes} минут до старта.`
+            });
+        }
+
+        const newStatus = attended ? 'attended' : 'no_show';
+
+        // Обновляем бронирование
+        const updatedBooking = await prisma.booking.update({
+            where: { id: booking.id },
+            data: {
+                status: newStatus,
+                checkedIn: attended,
+                checkedInAt: attended ? new Date() : null,
+                qrCodeScanned: true,
+                qrCodeScannedAt: new Date()
+            }
+        });
+
+        // Возвращаем посещение, если клиент не пришел
+        if (!attended && booking.membership && booking.membership.membershipType && 
+            booking.membership.membershipType.visitCount !== null && 
+            booking.membership.remainingVisits !== null) {
+            await prisma.membership.update({
+                where: { id: booking.membershipId },
+                data: {
+                    remainingVisits: booking.membership.remainingVisits + 1
+                }
+            });
+        }
+
+        // Создаем запись в логе посещаемости
+        const attendanceLog = await prisma.attendanceLog.create({
+            data: {
+                bookingId: booking.id,
+                trainerId: userId,
+                markedAt: new Date()
+            }
+        });
+
+        // Создаем запись в истории
+        await prisma.bookingHistory.create({
+            data: {
+                bookingId: booking.id,
+                status: newStatus
+            }
+        });
+
+        res.json({
+            success: true,
+            message: attended ? 'Посещение отмечено' : 'Клиент отмечен как не пришедший',
+            booking: {
+                id: updatedBooking.id,
+                status: updatedBooking.status,
+                checkedInAt: updatedBooking.checkedInAt
+            },
+            attendanceLog: {
+                id: attendanceLog.id,
+                markedAt: attendanceLog.markedAt
+            }
+        });
+    } catch (error) {
+        console.error('markAttendanceByQRCode error:', error);
+        res.status(500).json({ error: 'Ошибка при отметке посещения', details: error.message });
     }
 }
 
@@ -779,7 +1183,7 @@ async function cancelScheduleByTrainer(req, res) {
             where: { id },
             include: {
                 bookings: {
-                    where: { status: 'booked' },
+                    where: { status: { in: ['booked', 'attended', 'no_show'] } },
                     include: {
                         client: {
                             select: { id: true, fullName: true, email: true }
@@ -856,6 +1260,15 @@ async function cancelScheduleByTrainer(req, res) {
                     reason: reason
                 }
             );
+
+            // Отправляем сообщение в чат от тренера клиенту
+            await prisma.message.create({
+                data: {
+                    senderId: userId,
+                    receiverId: booking.client.id,
+                    content: `Здравствуйте! Занятие "${schedule.danceStyle?.name || 'Танцы'}" было отменено. ${reason ? 'Причина: ' + reason : ''}`
+                }
+            });
         }
 
         // Обновляем счётчик записей
@@ -1057,7 +1470,11 @@ module.exports = {
 
     // QR-коды
     generateBookingQRCode,
+    downloadQRCode,
     verifyBookingQRCode,
+    getTodayQRCodes,
+    getAllQRCodes,
+    markAttendanceByQRCode,
 
     // Уведомления
     getNotifications,

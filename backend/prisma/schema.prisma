@@ -155,6 +155,8 @@ model Booking {
   // QR-код для посещения
   qrCode          String?          @map("qrcode") @db.VarChar(255)
   qrCodeGenerated DateTime?        @map("qrcodegenerated") @db.Timestamp(6)
+  qrCodeScanned   Boolean?         @default(false) @map("qrcodescanned")
+  qrCodeScannedAt DateTime?        @map("qrcodescannedat") @db.Timestamp(6)
   checkedIn       Boolean?         @default(false) @map("checkedin")
   checkedInAt     DateTime?        @map("checkedinat") @db.Timestamp(6)
   attendanceLogs  AttendanceLog[]

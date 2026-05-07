@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { formatDate, formatTime, isPastDate, isPastDateTime, isToday } from '../../utils/dateHelpers';
+import { formatDate, formatTime, isPastDateTime, isToday } from '../../utils/dateHelpers';
 
 const statusConfig = {
   scheduled: { label: 'Открыта запись', badge: 'badge-success', icon: '✅' },
@@ -15,9 +15,10 @@ const ScheduleDetailModal = ({ item, onClose, onBook, booking, onChat }) => {
   const status = statusConfig[item.status] || statusConfig.scheduled;
   const startTime = formatTime(item.startTime);
   const endTime = formatTime(item.endTime);
-  const freeSlots = item.maxCapacity - item.currentBookings;
+  const currentBookings = item.bookingsCount ?? item.currentBookings;
+  const freeSlots = item.maxCapacity - currentBookings;
   const occupancy = item.maxCapacity > 0
-    ? Math.round((item.currentBookings / item.maxCapacity) * 100)
+    ? Math.round((currentBookings / item.maxCapacity) * 100)
     : 0;
   const pastNow = isPastDateTime(item.date, item.startTime);
 
@@ -99,7 +100,16 @@ const ScheduleDetailModal = ({ item, onClose, onBook, booking, onChat }) => {
               💬 Написать тренеру
             </button>
           )}
-          {item.status === 'scheduled' && freeSlots > 0 && !pastNow && (
+          {item.isBooked ? (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              padding: '0 16px', minHeight: '42px', borderRadius: '10px',
+              background: 'rgba(255,255,255,0.08)', color: '#A78BFA', fontWeight: 600,
+              border: '1px solid rgba(167,139,250,0.3)'
+            }}>
+              ✅ Вы уже записаны
+            </div>
+          ) : (item.status === 'scheduled' && freeSlots > 0 && !pastNow && (
             <button
               className="btn btn-primary"
               onClick={() => onBook(item.id)}
@@ -107,7 +117,7 @@ const ScheduleDetailModal = ({ item, onClose, onBook, booking, onChat }) => {
             >
               {booking ? '⏳ Запись...' : '✨ Записаться'}
             </button>
-          )}
+          ))}
         </div>
       </div>
     </div>
@@ -126,31 +136,61 @@ const Schedule = () => {
   const [booking, setBooking] = useState(false);
   const [danceStyles, setDanceStyles] = useState([]);
   const [selectedStyle, setSelectedStyle] = useState('');
+  const [bookedScheduleIds, setBookedScheduleIds] = useState(new Set());
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [schedRes, stylesRes] = await Promise.all([
         api.get('/schedule'),
         api.get('/dance-styles'),
       ]);
-      setSchedule(schedRes.data.schedule || []);
+
       setDanceStyles(stylesRes.data.danceStyles || []);
+
+      let scheduleItems = schedRes.data.schedule || [];
+      if (user?.role === 'client') {
+        try {
+          const bookingsRes = await api.get('/bookings');
+          const bookedIds = new Set(
+            (bookingsRes.data.bookings || [])
+              .filter(b => b.status !== 'cancelled')
+              .map(b => b.schedule?.id)
+              .filter(Boolean)
+          );
+          setBookedScheduleIds(bookedIds);
+          scheduleItems = scheduleItems.map(item => ({
+            ...item,
+            isBooked: bookedIds.has(item.id)
+          }));
+        } catch (bookingError) {
+          console.error('Ошибка загрузки записей клиента:', bookingError);
+        }
+      }
+
+      setSchedule(scheduleItems);
     } catch (error) {
       console.error('Ошибка загрузки:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.role]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleBook = async (scheduleId) => {
     if (user?.role !== 'client') {
       alert('Только клиенты могут записываться на занятия');
       return;
     }
+
+    const alreadyBooked = bookedScheduleIds.has(scheduleId);
+    if (alreadyBooked) {
+      alert('Вы уже записаны на это занятие');
+      return;
+    }
+
     setBooking(true);
     try {
       await api.post('/bookings', { scheduleId });
@@ -175,20 +215,22 @@ const Schedule = () => {
         item.trainer?.fullName?.toLowerCase().includes(search.toLowerCase()) ||
         item.hall?.name?.toLowerCase().includes(search.toLowerCase());
       const matchStyle = !selectedStyle || item.danceStyle?.id === parseInt(selectedStyle);
-      const freeSlots = item.maxCapacity - item.currentBookings;
+      const currentBookings = item.bookingsCount ?? item.currentBookings;
+      const freeSlots = item.maxCapacity - currentBookings;
       // Проверяем по дате И времени начала — занятие скрывается как только наступило его время
       const pastNow = isPastDateTime(item.date, item.startTime);
-      const pastDay = isPastDate(item.date);
-      if (filterStatus === 'available') return matchSearch && matchStyle && item.status === 'scheduled' && freeSlots > 0 && !pastNow;
+            if (filterStatus === 'available') return matchSearch && matchStyle && item.status === 'scheduled' && freeSlots > 0 && !pastNow;
       if (filterStatus === 'today') return matchSearch && matchStyle && isToday(item.date) && !pastNow;
       if (filterStatus === 'upcoming') return matchSearch && matchStyle && !pastNow;
       return matchSearch && matchStyle;
     })
     .sort((a, b) => {
+      const aCurrent = a.bookingsCount ?? a.currentBookings;
+      const bCurrent = b.bookingsCount ?? b.currentBookings;
       if (sortBy === 'date') return new Date(a.date) - new Date(b.date);
       if (sortBy === 'date_desc') return new Date(b.date) - new Date(a.date);
       if (sortBy === 'style') return (a.danceStyle?.name || '').localeCompare(b.danceStyle?.name || '');
-      if (sortBy === 'slots') return (b.maxCapacity - b.currentBookings) - (a.maxCapacity - a.currentBookings);
+      if (sortBy === 'slots') return (b.maxCapacity - bCurrent) - (a.maxCapacity - aCurrent);
       return 0;
     });
 
@@ -327,9 +369,10 @@ const ScheduleCard = ({ item, onClick, onBook }) => {
   const status = statusConfig[item.status] || statusConfig.scheduled;
   const startTime = formatTime(item.startTime);
   const endTime = formatTime(item.endTime);
-  const freeSlots = item.maxCapacity - item.currentBookings;
+  const currentBookings = item.bookingsCount ?? item.currentBookings;
+  const freeSlots = item.maxCapacity - currentBookings;
   const occupancy = item.maxCapacity > 0
-    ? Math.round((item.currentBookings / item.maxCapacity) * 100)
+    ? Math.round((currentBookings / item.maxCapacity) * 100)
     : 0;
   const pastNow = isPastDateTime(item.date, item.startTime);
   const today = isToday(item.date);
@@ -414,7 +457,7 @@ const ScheduleCard = ({ item, onClick, onBook }) => {
         </div>
       </div>
 
-      {onBook && item.status === 'scheduled' && freeSlots > 0 && !pastNow && (
+      {onBook && !item.isBooked && item.status === 'scheduled' && freeSlots > 0 && !pastNow && (
         <button
           className="btn btn-primary"
           style={{ width: '100%', justifyContent: 'center' }}
@@ -422,6 +465,15 @@ const ScheduleCard = ({ item, onClick, onBook }) => {
         >
           Записаться
         </button>
+      )}
+      {item.isBooked && (
+        <div style={{
+          textAlign: 'center', padding: '10px', marginTop: '10px',
+          background: 'rgba(167,139,250,0.12)', borderRadius: '8px',
+          color: '#C4B5FD', fontSize: '13px', fontWeight: '600'
+        }}>
+          ✅ Вы уже записаны
+        </div>
       )}
       {freeSlots === 0 && item.status === 'scheduled' && (
         <div style={{

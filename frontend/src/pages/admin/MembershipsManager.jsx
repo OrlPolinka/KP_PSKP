@@ -38,7 +38,7 @@ const MembershipsManager = () => {
   const handleStatusChange = async (id, newStatus) => {
     setUpdatingId(id);
     try {
-      const updated = await membershipService.updateMembershipStatus(id, newStatus);
+      await membershipService.updateMembershipStatus(id, newStatus);
       // Update in-place so the row stays visible regardless of current filter
       setMemberships(prev =>
         prev.map(m => m.id === id ? { ...m, status: newStatus } : m)

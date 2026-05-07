@@ -10,11 +10,15 @@ const statusConfig = {
 };
 
 const BookingCard = ({ booking, onCancel }) => {
-  const status = statusConfig[booking.status] || statusConfig.booked;
   const schedDate = booking.schedule?.date;
   const past = schedDate ? isPastDate(schedDate) : false;
   const today = schedDate ? isToday(schedDate) : false;
-  const canCancel = booking.status === 'booked' && !past;
+  const isFutureOrToday = schedDate ? (!isPastDate(schedDate) || isToday(schedDate)) : false;
+  const displayStatus = (isFutureOrToday && (booking.status === 'attended' || booking.status === 'no_show'))
+    ? 'booked'
+    : booking.status;
+  const status = statusConfig[displayStatus] || statusConfig.booked;
+  const canCancel = displayStatus === 'booked' && !past;
 
   return (
     <div style={{
@@ -119,7 +123,12 @@ const MyBookings = () => {
   const stats = {
     total: bookings.length,
     upcoming: upcoming.length,
-    attended: bookings.filter(b => b.status === 'attended').length,
+    attended: bookings.filter(b => {
+      const d = b.schedule?.date;
+      const futureOrToday = d ? (!isPastDate(d) || isToday(d)) : false;
+      const effective = (futureOrToday && (b.status === 'attended' || b.status === 'no_show')) ? 'booked' : b.status;
+      return effective === 'attended';
+    }).length,
     cancelled: cancelled.length,
   };
 

@@ -44,6 +44,28 @@ const DanceStyles = () => {
     }
   };
 
+  const getYouTubeEmbedUrl = (url) => {
+    if (!url) return '';
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes('youtu.be')) {
+        const id = u.pathname.split('/').filter(Boolean)[0];
+        return id ? `https://www.youtube.com/embed/${id}` : url;
+      }
+      if (u.hostname.includes('youtube.com')) {
+        if (u.pathname.includes('/shorts/')) {
+          const id = u.pathname.split('/shorts/')[1]?.split('/')[0];
+          return id ? `https://www.youtube.com/embed/${id}` : url;
+        }
+        const id = u.searchParams.get('v');
+        return id ? `https://www.youtube.com/embed/${id}` : url;
+      }
+      return url;
+    } catch {
+      return url;
+    }
+  };
+
   if (loading) {
     return (
       <div className="dance-styles-page">
@@ -128,7 +150,7 @@ const DanceStyles = () => {
                       <div className="video-container">
                         {style.videoUrl.includes('youtube.com') || style.videoUrl.includes('youtu.be') ? (
                           <iframe
-                            src={style.videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                            src={getYouTubeEmbedUrl(style.videoUrl)}
                             title={style.name}
                             frameBorder="0"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
