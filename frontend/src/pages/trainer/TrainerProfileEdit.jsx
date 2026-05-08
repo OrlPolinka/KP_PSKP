@@ -7,6 +7,7 @@ const TrainerProfileEdit = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [error, setError] = useState(null);
 
   const [formData, setFormData] = useState({
     specialization: '',
@@ -134,7 +135,14 @@ const TrainerProfileEdit = () => {
           try { setAchievements(JSON.parse(trainerInfo.achievements)); } catch (e) {}
         }
         if (trainerInfo.certificates) {
-          try { setCertificates(JSON.parse(trainerInfo.certificates)); } catch (e) {}
+          try { 
+            const parsed = JSON.parse(trainerInfo.certificates);
+            setCertificates(Array.isArray(parsed) ? parsed : []);
+          } catch (e) {
+            setCertificates([]);
+          }
+        } else {
+          setCertificates([]);
         }
         if (trainerInfo.socialLinks) {
           try { setSocialLinks(JSON.parse(trainerInfo.socialLinks)); } catch (e) {}
@@ -142,6 +150,8 @@ const TrainerProfileEdit = () => {
       }
     } catch (err) {
       console.error('Ошибка при загрузке профиля:', err);
+      setError('Не удалось загрузить профиль. Попробуйте обновить страницу.');
+      setMessage({ type: 'error', text: 'Ошибка при загрузке профиля' });
     } finally {
       setLoading(false);
     }
@@ -230,6 +240,9 @@ const TrainerProfileEdit = () => {
       await api.put(`/trainer/profile/${trainer.id}`, data);
       
       setMessage({ type: 'success', text: 'Профиль успешно сохранён!' });
+      
+      // Перезагружаем данные профиля после сохранения
+      await fetchTrainerProfile();
     } catch (err) {
       console.error('Ошибка при сохранении:', err);
       setMessage({ type: 'error', text: 'Ошибка при сохранении профиля' });
@@ -246,10 +259,15 @@ const TrainerProfileEdit = () => {
     );
   }
 
-  if (!trainer) {
+  if (!trainer || error) {
     return (
       <div className="trainer-profile-edit-page">
-        <div className="error-message">Профиль тренера не найден</div>
+        <div className="error-message">
+          {error || 'Профиль тренера не найден'}
+        </div>
+        <button onClick={() => window.location.reload()} className="retry-btn">
+          Попробовать снова
+        </button>
       </div>
     );
   }
