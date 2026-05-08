@@ -177,7 +177,7 @@ const Analytics = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
             <StatCard icon="📅" label="Всего занятий" value={popular.summary.totalSchedules} />
             <StatCard icon="👥" label="Всего записей" value={popular.summary.totalBookings} color="linear-gradient(135deg, #10B981, #059669)" />
-            <StatCard icon="💰" label="Выручка" value={`${(financial.summary.totalRevenue || 0).toLocaleString()} ₽`} color="linear-gradient(135deg, #F59E0B, #D97706)" />
+            <StatCard icon="💰" label="Выручка" value={`${(financial.summary.totalRevenue || 0).toLocaleString()} BYN`} color="linear-gradient(135deg, #F59E0B, #D97706)" />
             <StatCard icon="🎫" label="Абонементов" value={financial.summary.totalSoldMemberships} sub={`${financial.summary.activeMemberships} активных`} color="linear-gradient(135deg, #EC4899, #DB2777)" />
             <StatCard icon="🏋️" label="Тренеров" value={trainers.summary.totalTrainers} color="linear-gradient(135deg, #3B82F6, #2563EB)" />
             <StatCard icon="📈" label="Посещаемость" value={`${trainers.summary.overallAttendanceRate}%`} color="linear-gradient(135deg, #A78BFA, #8B5CF6)" />
@@ -385,9 +385,9 @@ const Analytics = () => {
       {activeTab === 'financial' && financial && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
-            <StatCard icon="💰" label="Общая выручка" value={`${(financial.summary.totalRevenue || 0).toLocaleString()} ₽`} color="linear-gradient(135deg, #F59E0B, #D97706)" />
+            <StatCard icon="💰" label="Общая выручка" value={`${(financial.summary.totalRevenue || 0).toLocaleString()} BYN`} color="linear-gradient(135deg, #F59E0B, #D97706)" />
             <StatCard icon="🎫" label="Продано абонементов" value={financial.summary.totalSoldMemberships} />
-            <StatCard icon="📊" label="Средний чек" value={`${(financial.summary.averageCheck || 0).toLocaleString()} ₽`} color="linear-gradient(135deg, #10B981, #059669)" />
+            <StatCard icon="📊" label="Средний чек" value={`${(financial.summary.averageCheck || 0).toLocaleString()} BYN`} color="linear-gradient(135deg, #10B981, #059669)" />
             <StatCard icon="✅" label="Активных" value={financial.summary.activeMemberships} color="linear-gradient(135deg, #A78BFA, #8B5CF6)" />
             <StatCard icon="📈" label="Рост" value={financial.summary.growthRate} color="linear-gradient(135deg, #EC4899, #DB2777)" />
           </div>
@@ -432,7 +432,7 @@ const Analytics = () => {
                   Ожидаемая выручка
                 </div>
                 <div style={{ fontSize: '28px', fontWeight: '800', color: '#A78BFA' }}>
-                  {(financial.forecast.nextPeriodRevenue || 0).toLocaleString()} ₽
+                  {(financial.forecast.nextPeriodRevenue || 0).toLocaleString()} BYN
                 </div>
               </div>
               <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '12px', padding: '20px' }}>
@@ -455,8 +455,8 @@ const Analytics = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {[
                     { label: 'Продано', value: `${type.soldCount} шт.`, color: '#A78BFA' },
-                    { label: 'Выручка', value: `${Math.round(type.totalRevenue).toLocaleString()} ₽`, color: '#F59E0B' },
-                    { label: 'Средняя цена', value: `${Math.round(type.averagePrice).toLocaleString()} ₽`, color: '#10B981' },
+                    { label: 'Выручка', value: `${Math.round(type.totalRevenue).toLocaleString()} BYN`, color: '#F59E0B' },
+                    { label: 'Средняя цена', value: `${Math.round(type.averagePrice).toLocaleString()} BYN`, color: '#10B981' },
                   ].map((s, i) => (
                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>{s.label}</span>

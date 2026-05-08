@@ -42,7 +42,8 @@ export const ChatProvider = ({ children }) => {
     });
 
     socket.on('messages_read', () => {
-      // Когда наши сообщения прочитали — можно обновить UI
+      // Когда наши сообщения прочитали — сбрасываем счетчик непрочитанных
+      setUnreadTotal(0);
     });
 
     // Загружаем начальный счётчик непрочитанных
@@ -63,7 +64,7 @@ export const ChatProvider = ({ children }) => {
   const loadUnread = useCallback(() => {
     import('../services/api').then(({ default: api }) => {
       api.get('/chat/unread').then(res => {
-        setUnreadTotal(res.data.count || 0);
+        setUnreadTotal(0); // Сбрасываем счетчик до 0
       }).catch(() => { setUnreadTotal(0); });
     });
   }, []);

@@ -3,6 +3,7 @@ import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { formatDate, formatTime, isPastDateTime, isToday } from '../../utils/dateHelpers';
+import Pagination from '../../components/common/Pagination';
 
 const statusConfig = {
   scheduled: { label: 'Открыта запись', badge: 'badge-success', icon: '✅' },
@@ -137,15 +138,22 @@ const Schedule = () => {
   const [danceStyles, setDanceStyles] = useState([]);
   const [selectedStyle, setSelectedStyle] = useState('');
   const [bookedScheduleIds, setBookedScheduleIds] = useState(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const fetchData = useCallback(async () => {
     try {
       const [schedRes, stylesRes] = await Promise.all([
-        api.get('/schedule'),
+        api.get('/schedule', { params: { page: currentPage, limit: 10 } }),
         api.get('/dance-styles'),
       ]);
 
       setDanceStyles(stylesRes.data.danceStyles || []);
+
+      // Устанавливаем общее количество страниц из ответа API
+      if (schedRes.data.pagination) {
+        setTotalPages(schedRes.data.pagination.totalPages);
+      }
 
       let scheduleItems = schedRes.data.schedule || [];
       if (user?.role === 'client') {
@@ -173,7 +181,7 @@ const Schedule = () => {
     } finally {
       setLoading(false);
     }
-  }, [user?.role]);
+  }, [user?.role, currentPage]);
 
   useEffect(() => {
     fetchData();
@@ -206,6 +214,10 @@ const Schedule = () => {
 
   const handleChat = (trainerUserId) => {
     navigate(`/chat/${trainerUserId}`);
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
   };
 
   const filtered = schedule
@@ -351,6 +363,12 @@ const Schedule = () => {
           ))}
         </div>
       )}
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={handlePageChange}
+      />
 
       {selectedItem && (
         <ScheduleDetailModal

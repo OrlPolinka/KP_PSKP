@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { bookingService } from '../../services/bookingService';
 import { formatDate, formatTime, isPastDate, isToday } from '../../utils/dateHelpers';
+import Pagination from '../../components/common/Pagination';
 
 const statusConfig = {
   booked: { label: 'Забронировано', badge: 'badge-purple', icon: '📅' },
@@ -81,21 +82,62 @@ const MyBookings = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('upcoming');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCounts, setTotalCounts] = useState({
+    upcoming: 0,
+    past: 0,
+    cancelled: 0
+  });
 
-  useEffect(() => {
-    fetchBookings();
+  const fetchTotalCounts = useCallback(async () => {
+    try {
+      const [upcomingRes, pastRes, cancelledRes] = await Promise.all([
+        bookingService.getBookings({ page: 1, limit: 1, bookingType: 'upcoming' }),
+        bookingService.getBookings({ page: 1, limit: 1, bookingType: 'past' }),
+        bookingService.getBookings({ page: 1, limit: 1, bookingType: 'cancelled' })
+      ]);
+      
+      setTotalCounts({
+        upcoming: upcomingRes.pagination?.total || 0,
+        past: pastRes.pagination?.total || 0,
+        cancelled: cancelledRes.pagination?.total || 0
+      });
+    } catch (error) {
+      console.error('Ошибка загрузки счетчиков:', error);
+    }
   }, []);
 
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     try {
       setError(null);
-      const response = await bookingService.getBookings();
+      const response = await bookingService.getBookings({ 
+        page: currentPage, 
+        limit: 5,
+        bookingType: activeTab
+      });
       setBookings(response.bookings || []);
+      if (response.pagination) {
+        setTotalPages(response.pagination.totalPages);
+      }
     } catch (error) {
       setError(error.response?.data?.error || 'Ошибка загрузки записей');
     } finally {
       setLoading(false);
     }
+  }, [currentPage, activeTab]);
+
+  useEffect(() => {
+    setCurrentPage(1); // Сбрасываем страницу при смене таба
+  }, [activeTab]);
+
+  useEffect(() => {
+    fetchBookings();
+    fetchTotalCounts();
+  }, [fetchBookings, fetchTotalCounts]);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
   };
 
   const handleCancel = async (bookingId) => {
@@ -103,33 +145,17 @@ const MyBookings = () => {
     try {
       await bookingService.cancelBooking(bookingId, 'Отменено клиентом');
       fetchBookings();
+      fetchTotalCounts();
     } catch (error) {
       alert(error.response?.data?.error || 'Ошибка при отмене записи');
     }
   };
 
-  const upcoming = bookings.filter(b => {
-    const d = b.schedule?.date;
-    return d && (!isPastDate(d) || isToday(d)) && b.status !== 'cancelled';
-  }).sort((a, b) => new Date(a.schedule?.date) - new Date(b.schedule?.date));
-
-  const past = bookings.filter(b => {
-    const d = b.schedule?.date;
-    return d && isPastDate(d) && !isToday(d);
-  }).sort((a, b) => new Date(b.schedule?.date) - new Date(a.schedule?.date));
-
-  const cancelled = bookings.filter(b => b.status === 'cancelled');
-
   const stats = {
-    total: bookings.length,
-    upcoming: upcoming.length,
-    attended: bookings.filter(b => {
-      const d = b.schedule?.date;
-      const futureOrToday = d ? (!isPastDate(d) || isToday(d)) : false;
-      const effective = (futureOrToday && (b.status === 'attended' || b.status === 'no_show')) ? 'booked' : b.status;
-      return effective === 'attended';
-    }).length,
-    cancelled: cancelled.length,
+    total: totalCounts.upcoming + totalCounts.past + totalCounts.cancelled,
+    upcoming: totalCounts.upcoming,
+    attended: totalCounts.past,
+    cancelled: totalCounts.cancelled,
   };
 
   if (loading) return (
@@ -146,12 +172,12 @@ const MyBookings = () => {
   );
 
   const tabs = [
-    { key: 'upcoming', label: `🔜 Предстоящие (${upcoming.length})` },
-    { key: 'past', label: `📚 Прошедшие (${past.length})` },
-    { key: 'cancelled', label: `❌ Отменённые (${cancelled.length})` },
+    { key: 'upcoming', label: '🔜 Предстоящие' },
+    { key: 'past', label: '📚 Прошедшие' },
+    { key: 'cancelled', label: '❌ Отменённые' },
   ];
 
-  const currentList = activeTab === 'upcoming' ? upcoming : activeTab === 'past' ? past : cancelled;
+  const currentList = bookings;
 
   return (
     <div className="container">
@@ -231,6 +257,12 @@ const MyBookings = () => {
           ))}
         </div>
       )}
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={handlePageChange}
+      />
     </div>
   );
 };

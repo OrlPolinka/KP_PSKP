@@ -30,6 +30,125 @@ function getTimeString(dateObj) {
     return `${hours}:${minutes}`;
 }
 
+// ==================== ФУНКЦИИ ВАЛИДАЦИИ ====================
+
+function validatePhoneNumber(phone) {
+    if (!phone) return { valid: true, error: null };
+    
+    // Проверка формат +375XXXXXXX (12 символов)
+    const phoneRegex = /^\+375\d{9}$/;
+    if (!phoneRegex.test(phone)) {
+        return { valid: false, error: 'Номер телефона должен быть в формате +375XXXXXXXXX (12 символов)' };
+    }
+    
+    return { valid: true, error: null };
+}
+
+function validateMembershipType(membershipType) {
+    if (!membershipType) return { valid: true, error: null };
+    
+    // Нельзя одновременно безлимит на время и на количество
+    if (membershipType.visitCount === null && membershipType.durationDays === null) {
+        return { valid: false, error: 'Абонемент должен иметь либо количество посещений, либо срок действия' };
+    }
+    
+    // Если безлимит по времени, то visitCount должен быть null
+    if (membershipType.durationDays !== null && membershipType.visitCount !== null) {
+        return { valid: false, error: 'Абонемент с ограничением по времени не может иметь ограничение по количеству посещений' };
+    }
+    
+    // Проверка цены
+    if (membershipType.price <= 0) {
+        return { valid: false, error: 'Цена должна быть больше 0' };
+    }
+
+    // Проверка максимальной цены
+    if (membershipType.price > 1000) {
+        return { valid: false, error: 'Цена не может превышать 1000 рублей' };
+    }
+
+    return { valid: true, error: null };
+}
+
+function validateScheduleTime(startTime, endTime) {
+    if (!startTime || !endTime) return { valid: true, error: null };
+    
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    
+    // Проверка что конец после начала
+    if (end <= start) {
+        return { valid: false, error: 'Время окончания должно быть позже времени начала' };
+    }
+
+    // Минимум 1 час разницы
+    const diffHours = (end - start) / (1000 * 60 * 60);
+    if (diffHours < 1) {
+        return { valid: false, error: 'Занятие должно длиться минимум 1 час' };
+    }
+
+    // Максимум 3 часа
+    if (diffHours > 3) {
+        return { valid: false, error: 'Занятие не может длиться больше 3 часов' };
+    }
+
+    return { valid: true, error: null };
+}
+
+function validateDateNotPast(date, fieldName = 'дата') {
+    if (!date) return { valid: true, error: null };
+    
+    const inputDate = new Date(date);
+    const now = new Date();
+    
+    // Сбрасываем время для сравнения только дат
+    inputDate.setHours(0, 0, 0, 0);
+    now.setHours(0, 0, 0, 0);
+    
+    if (inputDate < now) {
+        return { valid: false, error: `${fieldName} не может быть в прошлом` };
+    }
+    
+    return { valid: true, error: null };
+}
+
+function validateDateTimeNotPast(dateTime, fieldName = 'дата и время') {
+    if (!dateTime) return { valid: true, error: null };
+    
+    const inputDateTime = new Date(dateTime);
+    const now = new Date();
+    
+    if (inputDateTime < now) {
+        return { valid: false, error: `${fieldName} не могут быть в прошлом` };
+    }
+    
+    return { valid: true, error: null };
+}
+
+function validateEmail(email) {
+    if (!email) return { valid: true, error: null };
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return { valid: false, error: 'Некорректный формат email' };
+    }
+    
+    return { valid: true, error: null };
+}
+
+function validateRequiredFields(data, requiredFields) {
+    const missingFields = requiredFields.filter(field => !data[field]);
+    
+    if (missingFields.length > 0) {
+        return { 
+            valid: false, 
+            error: `Обязательные поля не заполнены: ${missingFields.join(', ')}` 
+        };
+    }
+    
+    return { valid: true, error: null };
+}
+
 function combineDateAndTime(dateValue, timeValue) {
     if (!dateValue || !timeValue) return null;
     const date = new Date(dateValue);
@@ -48,6 +167,20 @@ class Controler{
                 return res.status(400).json({
                     error: 'Email, пароль и имя обязательны'
                 });
+            }
+
+            // Валидация email
+            const emailValidation = validateEmail(email);
+            if (!emailValidation.valid) {
+                return res.status(400).json({ error: emailValidation.error });
+            }
+
+            // Валидация телефона если он указан
+            if (phone) {
+                const phoneValidation = validatePhoneNumber(phone);
+                if (!phoneValidation.valid) {
+                    return res.status(400).json({ error: phoneValidation.error });
+                }
             }
 
             let existingUser = await prisma.user.findUnique({
@@ -210,7 +343,18 @@ class Controler{
     //пользователи
     async getUsers(req, res){
         try{
+            let {page = 1, limit = 10} = req.query;
+
+            // Пагинация
+            const skip = (parseInt(page) - 1) * parseInt(limit);
+            const take = parseInt(limit);
+
+            // Получаем общее количество пользователей для пагинации
+            const total = await prisma.user.count();
+
             let users = await prisma.user.findMany({
+                skip,
+                take,
                 select: {
                     id: true,
                     email: true,
@@ -225,7 +369,15 @@ class Controler{
                 orderBy: {createdAt: 'desc'}
             });
 
-            res.json({users});
+            res.json({
+                users,
+                pagination: {
+                    total,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    totalPages: Math.ceil(total / parseInt(limit))
+                }
+            });
         }
         catch(error){
             console.error('getUsers error:', error);
@@ -356,6 +508,20 @@ class Controler{
                 });
             }
 
+            // Валидация email
+            const emailValidation = validateEmail(email);
+            if (!emailValidation.valid) {
+                return res.status(400).json({ error: emailValidation.error });
+            }
+
+            // Валидация телефона если он указан
+            if (phone) {
+                const phoneValidation = validatePhoneNumber(phone);
+                if (!phoneValidation.valid) {
+                    return res.status(400).json({ error: phoneValidation.error });
+                }
+            }
+
             let existingTrainer = await prisma.user.findUnique({
                 where: {email}
             });
@@ -434,6 +600,12 @@ class Controler{
             }
 
             if(email && email !== existingTrainer.email){
+                // Валидация email
+                const emailValidation = validateEmail(email);
+                if (!emailValidation.valid) {
+                    return res.status(400).json({ error: emailValidation.error });
+                }
+
                 let userWithSameEmail = await prisma.user.findUnique({
                     where: {email}
                 });
@@ -442,6 +614,14 @@ class Controler{
                     return res.status(400).json({
                         error: 'Пользователь с таким email уже существует'
                     });
+                }
+            }
+
+            // Валидация телефона если он указан
+            if (phone !== undefined && phone !== null) {
+                const phoneValidation = validatePhoneNumber(phone);
+                if (!phoneValidation.valid) {
+                    return res.status(400).json({ error: phoneValidation.error });
                 }
             }
 
@@ -576,6 +756,27 @@ class Controler{
             if(!danceStyleIdValue || !trainerId || !hallIdValue || !startTime || !endTime || !maxCapacityValue || !date){
                 return res.status(400).json({
                     error: 'Танцевальное направление, тренер, зал, начальное и конечное время, максимальная вместимость и дата обязательны'
+                });
+            }
+
+            // Валидация даты (нельзя прошедшее время)
+            const dateValidation = validateDateNotPast(date, 'Дата занятия');
+            if (!dateValidation.valid) {
+                return res.status(400).json({ error: dateValidation.error });
+            }
+
+            // Валидация времени (минимум 1 час, конец после начала)
+            const startDateTime = new Date(startTime);
+            const endDateTime = new Date(endTime);
+            const timeValidation = validateScheduleTime(startDateTime, endDateTime);
+            if (!timeValidation.valid) {
+                return res.status(400).json({ error: timeValidation.error });
+            }
+
+            // Валидация вместимости (должна быть больше 0)
+            if (maxCapacityValue <= 0) {
+                return res.status(400).json({
+                    error: 'Максимальная вместимость должна быть больше 0'
                 });
             }
 
@@ -821,15 +1022,40 @@ class Controler{
             }
             
             let newDate = date ? new Date(date) : existingSchedule.date;
-            let newStartTime = startTime 
-                ? new Date(`1970-01-01T${startTime}`) 
+            let newStartTime = startTime
+                ? new Date(`1970-01-01T${startTime}`)
                 : existingSchedule.startTime;
-            let newEndTime = endTime 
-                ? new Date(`1970-01-01T${endTime}`) 
+            let newEndTime = endTime
+                ? new Date(`1970-01-01T${endTime}`)
                 : existingSchedule.endTime;
             let newHallId = hallId || existingSchedule.hallId;
             let newTrainerId = trainerId || existingSchedule.trainerId;
-            
+
+            // Валидация даты если она изменилась
+            if (date) {
+                const dateValidation = validateDateNotPast(newDate, 'Дата занятия');
+                if (!dateValidation.valid) {
+                    return res.status(400).json({ error: dateValidation.error });
+                }
+            }
+
+            // Валидация времени если оно изменилось
+            if (startTime || endTime) {
+                const timeValidation = validateScheduleTime(newStartTime, newEndTime);
+                if (!timeValidation.valid) {
+                    return res.status(400).json({ error: timeValidation.error });
+                }
+            }
+
+            // Валидация вместимости если она изменилась
+            if (maxCapacity !== undefined) {
+                if (maxCapacity <= 0) {
+                    return res.status(400).json({
+                        error: 'Максимальная вместимость должна быть больше 0'
+                    });
+                }
+            }
+
             if (trainerId && trainerId !== existingSchedule.trainerId) {
                 let trainer = await prisma.user.findFirst({
                     where: {
@@ -1036,7 +1262,11 @@ class Controler{
     async getSchedule(req, res){
         try{
             let {role, id: userId} = req.user;
-            let {date, trainerId, status, fromDate, toDate} = req.query;
+            let {date, trainerId, status, fromDate, toDate, page = 1, limit = 10} = req.query;
+
+            // Пагинация
+            const skip = (parseInt(page) - 1) * parseInt(limit);
+            const take = parseInt(limit);
 
             //условия фильтрации
             let where = {};
@@ -1074,8 +1304,13 @@ class Controler{
                 where.date = { gte: new Date() };
             }
 
+            // Получаем общее количество записей для пагинации
+            const total = await prisma.schedule.count({ where });
+
             let schedule = await prisma.schedule.findMany({
                 where,
+                skip,
+                take,
                 include: {
                     danceStyle: true,
                     trainer: {
@@ -1133,7 +1368,13 @@ class Controler{
 
             res.json({
                 success: true,
-                schedule: formattedSchedule
+                schedule: formattedSchedule,
+                pagination: {
+                    total,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    totalPages: Math.ceil(total / parseInt(limit))
+                }
             });
         }
         catch(error){
@@ -1218,7 +1459,11 @@ class Controler{
     async getMemberships(req, res){
         try{
             let {role, id: userId} = req.user;
-            let {status, clientId} = req.query;
+            let {status, clientId, page = 1, limit = 10} = req.query;
+
+            // Пагинация
+            const skip = (parseInt(page) - 1) * parseInt(limit);
+            const take = parseInt(limit);
 
             let where = {};
 
@@ -1234,8 +1479,13 @@ class Controler{
                 where.status = status;
             }
 
+            // Получаем общее количество записей для пагинации
+            const total = await prisma.membership.count({ where });
+
             let memberships = await prisma.membership.findMany({
                 where,
+                skip,
+                take,
                 include: {
                     membershipType: true,
                     client: {
@@ -1290,7 +1540,13 @@ class Controler{
 
             res.json({
                 success: true,
-                memberships: formattedMemberships 
+                memberships: formattedMemberships,
+                pagination: {
+                    total,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    totalPages: Math.ceil(total / parseInt(limit))
+                }
             });
         }
         catch(error){
@@ -1430,13 +1686,29 @@ class Controler{
                 });
             }
 
-            let startDate = new Date();
-            let endDate = membershipType.durationDays 
+            // Если пользователь передает свои даты, валидируем их
+            let startDate = req.body.startDate ? new Date(req.body.startDate) : new Date();
+            if (req.body.startDate) {
+                const dateValidation = validateDateTimeNotPast(startDate, 'Дата начала абонемента');
+                if (!dateValidation.valid) {
+                    return res.status(400).json({ error: dateValidation.error });
+                }
+            }
+
+            let endDate = membershipType.durationDays
                 ? new Date(startDate.getTime() + membershipType.durationDays * 24 * 60 * 60 * 1000)
                 : null;
-            
-            let remainingVisits = membershipType.visitCount === null 
-                ? null 
+
+            // Если пользователь передает свою дату окончания, валидируем её
+            if (req.body.endDate) {
+                endDate = new Date(req.body.endDate);
+                if (endDate <= startDate) {
+                    return res.status(400).json({ error: 'Дата окончания должна быть позже даты начала' });
+                }
+            }
+
+            let remainingVisits = membershipType.visitCount === null
+                ? null
                 : membershipType.visitCount;
 
             let membership = await prisma.membership.create({
@@ -1704,7 +1976,25 @@ class Controler{
                 return res.status(400).json({
                     error: 'Цена не может быть отрицательной'
                 });
-            }            
+            }
+
+            // Валидация дат если они изменяются
+            if (startDate !== undefined) {
+                const newStartDate = new Date(startDate);
+                const dateValidation = validateDateTimeNotPast(newStartDate, 'Дата начала абонемента');
+                if (!dateValidation.valid) {
+                    return res.status(400).json({ error: dateValidation.error });
+                }
+            }
+
+            if (startDate !== undefined || endDate !== undefined) {
+                const newStartDate = startDate ? new Date(startDate) : existingMembership.startDate;
+                const newEndDate = endDate ? new Date(endDate) : existingMembership.endDate;
+
+                if (newEndDate && newEndDate <= newStartDate) {
+                    return res.status(400).json({ error: 'Дата окончания должна быть позже даты начала' });
+                }
+            }
 
             let updateData = {};
             if(clientId !== undefined) updateData.clientId = clientId;
@@ -1826,6 +2116,16 @@ class Controler{
                 });
             }
 
+            // Валидация типа абонемента (нельзя одновременно безлимит на время и количество)
+            const membershipTypeValidation = validateMembershipType({
+                visitCount: visitCount !== undefined ? visitCount : null,
+                durationDays: durationDays !== undefined ? durationDays : null,
+                price: price
+            });
+            if (!membershipTypeValidation.valid) {
+                return res.status(400).json({ error: membershipTypeValidation.error });
+            }
+
             let existingMembershipType = await prisma.membershipType.findFirst({
                 where: {name}
             });
@@ -1912,6 +2212,18 @@ class Controler{
                 return res.status(400).json({
                     error: 'Количество занятий должно быть больше 0 или null для безлимитного типа'
                 });
+            }
+
+            // Валидация типа абонемента если изменяются параметры
+            if (visitCount !== undefined || durationDays !== undefined || price !== undefined) {
+                const membershipTypeValidation = validateMembershipType({
+                    visitCount: visitCount !== undefined ? visitCount : existingType.visitCount,
+                    durationDays: durationDays !== undefined ? durationDays : existingType.durationDays,
+                    price: price !== undefined ? price : existingType.price
+                });
+                if (!membershipTypeValidation.valid) {
+                    return res.status(400).json({ error: membershipTypeValidation.error });
+                }
             }
 
             if(name && name !== existingType.name){
@@ -2008,8 +2320,15 @@ class Controler{
                 status,
                 date,
                 fromDate,
-                toDate
+                toDate,
+                bookingType,
+                page = 1,
+                limit = 10
             } = req.query;
+
+            // Пагинация
+            const skip = (parseInt(page) - 1) * parseInt(limit);
+            const take = parseInt(limit);
 
             let where = {};
 
@@ -2053,8 +2372,34 @@ class Controler{
                 if(toDate) where.schedule.date.lte = new Date(toDate);
             }
 
+            // Фильтрация по типу записей
+            if(bookingType){
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                if(bookingType === 'upcoming'){
+                    where.status = {not: 'cancelled'};
+                    where.schedule = {
+                        ...where.schedule,
+                        date: { gte: today }
+                    };
+                } else if(bookingType === 'past'){
+                    where.schedule = {
+                        ...where.schedule,
+                        date: { lt: today }
+                    };
+                } else if(bookingType === 'cancelled'){
+                    where.status = 'cancelled';
+                }
+            }
+
+            // Получаем общее количество записей для пагинации
+            const total = await prisma.booking.count({ where });
+
             let bookings = await prisma.booking.findMany({
                 where,
+                skip,
+                take,
                 include: {
                     schedule: {
                         include: {
@@ -2093,7 +2438,8 @@ class Controler{
                     attendanceLogs: true
                 },
                 orderBy: [
-                    {bookingTime: 'desc'}
+                    {schedule: {date: 'asc'}},
+                    {schedule: {startTime: 'asc'}}
                 ]
             });
 
@@ -2134,7 +2480,13 @@ class Controler{
             res.json({
                 success: true,
                 count: bookings.length,
-                bookings: formattedBookings
+                bookings: formattedBookings,
+                pagination: {
+                    total,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    totalPages: Math.ceil(total / parseInt(limit))
+                }
             });
         }
         catch(error){
@@ -2481,10 +2833,16 @@ class Controler{
                 }
             });
 
-            if(membership.membershipType.visitCount !== null && membership.remainingVisits !== null){
+            if(membership.membershipType.visitCount !== null && membership.remainingVisits !== null && membership.remainingVisits > 0){
+                const newRemainingVisits = membership.remainingVisits - 1;
+                
                 await prisma.membership.update({
                     where: {id: selectedMembershipId},
-                    data: {remainingVisits: membership.remainingVisits - 1}
+                    data: {
+                        remainingVisits: newRemainingVisits,
+                        // Если занятия закончились, деактивируем абонемент
+                        ...(newRemainingVisits <= 0 && { status: 'expired' })
+                    }
                 });
             }
             
@@ -2961,7 +3319,7 @@ class Controler{
                     attended: attendedCount,
                     noShow: noShowCount,
                     attendanceRate: totalCount > 0 ?
-                        Math.round((attendedCount / totalCount) * 100) : 0
+                        Math.min(Math.round((attendedCount / totalCount) * 100), 100) : 0
                 };
             }
 
@@ -3053,7 +3411,9 @@ class Controler{
                         ? Math.round(item.totalMaxCapacity / item.schedulesCount)
                         : 0;
                     let occupancyRate = avgMaxCapacity > 0
+
                         ? Math.round((averageOccupancy / avgMaxCapacity) * 100)
+
                         : 0;
                     return {
                         danceStyleId: item.danceStyleId,
@@ -3165,7 +3525,7 @@ class Controler{
                     : 0;
                 
                 let attendanceRate = totalBookings > 0 
-                    ? Math.round((attendedBookings / totalBookings) * 100) 
+                    ? Math.min(Math.round((attendedBookings / totalBookings) * 100), 100) 
                     : 0;
                 
                 return {
@@ -3185,7 +3545,7 @@ class Controler{
                         averageAttendance,
                         attendanceRate,
                         occupancyRate: averageAttendance > 0 
-                            ? Math.round((averageAttendance / 20) * 100) 
+                            ? Math.min(Math.round((averageAttendance / 20) * 100), 100) 
                             : 0  // предполагаем среднюю вместимость зала 20
                     }
                 };
@@ -3433,6 +3793,11 @@ class Controler{
                 return res.status(400).json({ error: 'Вместимость зала должна быть больше 0' });
             }
 
+            // Валидация вместимости (не должна быть слишком большой)
+            if (capacity > 100) {
+                return res.status(400).json({ error: 'Вместимость зала не может превышать 100 человек' });
+            }
+
             let existingHall = await prisma.hall.findFirst({
                 where: {name}
             });
@@ -3505,6 +3870,11 @@ class Controler{
 
             if (capacity !== undefined && capacity <= 0) {
                 return res.status(400).json({ error: 'Вместимость зала должна быть больше 0' });
+            }
+
+            // Валидация вместимости (не должна быть слишком большой)
+            if (capacity !== undefined && capacity > 100) {
+                return res.status(400).json({ error: 'Вместимость зала не может превышать 100 человек' });
             }
 
             if (isActive === false && existingHall.isActive === true) {
@@ -3622,7 +3992,16 @@ class Controler{
             if (!name) {
                 return res.status(400).json({ error: 'Название обязательно' });
             }
-            
+
+            // Валидация длины названия
+            if (name.length < 3) {
+                return res.status(400).json({ error: 'Название должно содержать минимум 3 символа' });
+            }
+
+            if (name.length > 100) {
+                return res.status(400).json({ error: 'Название не может превышать 100 символов' });
+            }
+
             let existing = await prisma.danceStyle.findUnique({
                 where: { name }
             });
@@ -3660,6 +4039,15 @@ class Controler{
             }
             
             if (name && name !== existing.name) {
+                // Валидация длины названия
+                if (name.length < 3) {
+                    return res.status(400).json({ error: 'Название должно содержать минимум 3 символа' });
+                }
+
+                if (name.length > 100) {
+                    return res.status(400).json({ error: 'Название не может превышать 100 символов' });
+                }
+
                 let duplicate = await prisma.danceStyle.findUnique({
                     where: { name }
                 });
@@ -3667,7 +4055,7 @@ class Controler{
                     return res.status(400).json({ error: 'Стиль с таким названием уже существует' });
                 }
             }
-            
+
             let danceStyle = await prisma.danceStyle.update({
                 where: { id: parseInt(id) },
                 data: {
@@ -3726,6 +4114,14 @@ class Controler{
             let existingUser = await prisma.user.findUnique({ where: { id } });
             if (!existingUser) {
                 return res.status(404).json({ error: 'Пользователь не найден' });
+            }
+
+            // Валидация телефона если он указан
+            if (phone !== undefined && phone !== null) {
+                const phoneValidation = validatePhoneNumber(phone);
+                if (!phoneValidation.valid) {
+                    return res.status(400).json({ error: phoneValidation.error });
+                }
             }
 
             // Build update via raw SQL to handle photoUrl (Text column) regardless of client cache
@@ -3992,15 +4388,22 @@ class Controler{
     // Количество непрочитанных сообщений от конкретного контакта
     async getUnreadCountForContact(req, res) {
         try {
-            const { id: userId } = req.user;
+            const { id: userId, role } = req.user;
             const { contactId } = req.params;
-            const result = await prisma.$queryRaw`
+            
+            // Админ может видеть непрочитанные для любого контакта
+            let whereClause = `senderid = ${contactId}::uuid AND receiverid = ${userId}::uuid AND isread = false`;
+            
+            // Для остальных ролей - только свои сообщения
+            if (role !== 'admin') {
+                whereClause = `((senderid = ${contactId}::uuid AND receiverid = ${userId}::uuid) OR (senderid = ${userId}::uuid AND receiverid = ${contactId}::uuid)) AND isread = false`;
+            }
+            
+            const result = await prisma.$queryRaw(`
                 SELECT COUNT(*)::int as count
                 FROM messages
-                WHERE senderid = ${contactId}::uuid
-                  AND receiverid = ${userId}::uuid
-                  AND isread = false
-            `;
+                WHERE ${whereClause}
+            `);
             res.json({ success: true, count: result[0]?.count || 0 });
         } catch (error) {
             console.error('getUnreadCountForContact error:', error);
@@ -4011,7 +4414,7 @@ class Controler{
     // Редактировать своё сообщение
     async editMessage(req, res) {
         try {
-            const { id: userId } = req.user;
+            const { id: userId, role } = req.user;
             const { messageId } = req.params;
             const { content } = req.body;
 
@@ -4023,7 +4426,11 @@ class Controler{
                 SELECT id, senderid, receiverid FROM messages WHERE id = ${parseInt(messageId)}
             `;
             if (!existing[0]) return res.status(404).json({ error: 'Сообщение не найдено' });
-            if (existing[0].senderid !== userId) return res.status(403).json({ error: 'Нельзя редактировать чужое сообщение' });
+            
+            // Админ может редактировать любые сообщения, остальные - только свои
+            if (role !== 'admin' && existing[0].senderid !== userId) {
+                return res.status(403).json({ error: 'Нельзя редактировать чужое сообщение' });
+            }
 
             await prisma.$executeRaw`
                 UPDATE messages SET content = ${content.trim()}, edited = true WHERE id = ${parseInt(messageId)}
@@ -4039,14 +4446,18 @@ class Controler{
     // Удалить своё сообщение
     async deleteMessage(req, res) {
         try {
-            const { id: userId } = req.user;
+            const { id: userId, role } = req.user;
             const { messageId } = req.params;
 
             const existing = await prisma.$queryRaw`
                 SELECT id, senderid, receiverid FROM messages WHERE id = ${parseInt(messageId)}
             `;
             if (!existing[0]) return res.status(404).json({ error: 'Сообщение не найдено' });
-            if (existing[0].senderid !== userId) return res.status(403).json({ error: 'Нельзя удалить чужое сообщение' });
+            
+            // Админ может удалять любые сообщения, остальные - только свои
+            if (role !== 'admin' && existing[0].senderid !== userId && existing[0].receiverid !== userId) {
+                return res.status(403).json({ error: 'Нельзя удалить чужое сообщение' });
+            }
 
             const receiverId = existing[0].receiverid;
 
@@ -4113,12 +4524,202 @@ class Controler{
             });
 
             res.json({ success: true, users });
-        } catch (error) {
+        }
+        catch(error){
             console.error('searchChatUsers error:', error);
-            res.status(500).json({ error: 'Ошибка поиска' });
+            res.status(500).json({ error: 'Ошибка при поиске пользователя для нового чата' });
+        }
+    }
+        // Количество непрочитанных сообщений от конкретного контакта
+        async getUnreadCountForContact(req, res) {
+            try {
+                const { id: userId } = req.user;
+                const { contactId } = req.params;
+                const result = await prisma.$queryRaw`
+                    SELECT COUNT(*)::int as count
+                    FROM messages
+                    WHERE senderid = ${contactId}::uuid
+                      AND receiverid = ${userId}::uuid
+                      AND isread = false
+                `;
+                res.json({ success: true, count: result[0]?.count || 0 });
+            } catch (error) {
+                console.error('getUnreadCountForContact error:', error);
+                res.status(500).json({ error: 'Ошибка' });
+            }
+        }
+
+        // Редактировать своё сообщение
+        async editMessage(req, res) {
+            try {
+                const { id: userId } = req.user;
+                const { messageId } = req.params;
+                const { content } = req.body;
+
+                if (!content?.trim()) {
+                    return res.status(400).json({ error: 'Текст сообщения не может быть пустым' });
+                }
+
+                const existing = await prisma.$queryRaw`
+                    SELECT id, senderid, receiverid FROM messages WHERE id = ${parseInt(messageId)}
+                `;
+                if (!existing[0]) return res.status(404).json({ error: 'Сообщение не найдено' });
+                if (existing[0].senderid !== userId) return res.status(403).json({ error: 'Нельзя редактировать чужое сообщение' });
+
+                await prisma.$executeRaw`
+                    UPDATE messages SET content = ${content.trim()}, edited = true WHERE id = ${parseInt(messageId)}
+                `;
+
+                res.json({ success: true, messageId: parseInt(messageId), content: content.trim() });
+            } catch (error) {
+                console.error('editMessage error:', error);
+                res.status(500).json({ error: 'Ошибка при редактировании сообщения' });
+            }
+        }
+
+        // Удалить своё сообщение
+        async deleteMessage(req, res) {
+            try {
+                const { id: userId } = req.user;
+                const { messageId } = req.params;
+
+                const existing = await prisma.$queryRaw`
+                    SELECT id, senderid, receiverid FROM messages WHERE id = ${parseInt(messageId)}
+                `;
+                if (!existing[0]) return res.status(404).json({ error: 'Сообщение не найдено' });
+                if (existing[0].senderid !== userId) return res.status(403).json({ error: 'Нельзя удалить чужое сообщение' });
+
+                const receiverId = existing[0].receiverid;
+
+                await prisma.$executeRaw`DELETE FROM messages WHERE id = ${parseInt(messageId)}`;
+
+                res.json({ success: true, messageId: parseInt(messageId), receiverId });
+            } catch (error) {
+                console.error('deleteMessage error:', error);
+                res.status(500).json({ error: 'Ошибка при удалении сообщения' });
+            }
+        }
+
+        // Удалить диалог (все сообщения между двумя пользователями)
+        async deleteDialog(req, res) {
+            try {
+                const { id: userId } = req.user;
+                const { userId: otherUserId } = req.params;
+
+                await prisma.$executeRaw`
+                    DELETE FROM messages
+                    WHERE (senderid = ${userId}::uuid AND receiverid = ${otherUserId}::uuid)
+                       OR (senderid = ${otherUserId}::uuid AND receiverid = ${userId}::uuid)
+                `;
+
+                res.json({ success: true });
+            } catch (error) {
+                console.error('deleteDialog error:', error);
+                res.status(500).json({ error: 'Ошибка при удалении диалога' });
+            }
+        }
+
+        // Поиск пользователей для нового чата
+        async searchChatUsers(req, res) {
+            try {
+                const { id: userId, role } = req.user;
+                const { q } = req.query;
+
+                if (!q || q.trim().length < 2) {
+                    return res.json({ success: true, users: [] });
+                }
+
+                const search = `%${q.trim().toLowerCase()}%`;
+
+                // Определяем кому можно писать в зависимости от роли
+                let roleFilter = {};
+                if (role === 'client') {
+                    // Клиент может писать только тренерам
+                    roleFilter = { role: 'trainer' };
+                } else if (role === 'trainer') {
+                    // Тренер может писать клиентам и другим тренерам
+                    roleFilter = { role: { in: ['client', 'trainer'] } };
+                }
+                // Админ может писать всем
+
+                const users = await prisma.user.findMany({
+                    where: {
+                        id: { not: userId },
+                        isActive: true,
+                        ...roleFilter,
+                        fullName: { contains: q.trim(), mode: 'insensitive' },
+                    },
+                    select: { id: true, fullName: true, photoUrl: true, role: true },
+                    take: 10,
+                });
+
+                res.json({ success: true, users });
+            } catch (error) {
+                console.error('searchChatUsers error:', error);
+                res.status(500).json({ error: 'Ошибка поиска' });
+            }
+        }
+
+        // Смена пароля пользователя
+        async changePassword(req, res) {
+            try {
+                let { role, id: userId } = req.user;
+                let { currentPassword, newPassword } = req.body;
+
+                if (role !== 'client' && role !== 'trainer' && role !== 'admin') {
+                    return res.status(403).json({
+                        error: 'Сменить пароль могут только авторизованные пользователи'
+                    });
+                }
+
+                if (!currentPassword || !newPassword) {
+                    return res.status(400).json({
+                        error: 'Необходимо указать текущий и новый пароль'
+                    });
+                }
+
+                if (newPassword.length < 6) {
+                    return res.status(400).json({
+                        error: 'Новый пароль должен содержать минимум 6 символов'
+                    });
+                }
+
+                // Проверяем текущий пароль
+                const user = await prisma.user.findUnique({
+                    where: { id: userId }
+                });
+
+                if (!user) {
+                    return res.status(404).json({
+                        error: 'Пользователь не найден'
+                    });
+                }
+
+                const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+                if (!isCurrentPasswordValid) {
+                    return res.status(400).json({
+                        error: 'Текущий пароль указан неверно'
+                    });
+                }
+
+                // Хешируем новый пароль
+                const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+                // Обновляем пароль
+                await prisma.user.update({
+                    where: { id: userId },
+                    data: { password: hashedNewPassword }
+                });
+
+                res.json({
+                    success: true,
+                    message: 'Пароль успешно изменен'
+                });
+            } catch (error) {
+                console.error('changePassword error:', error);
+                res.status(500).json({ error: 'Ошибка при смене пароля' });
+            }
         }
     }
 
-}
-
-module.exports = Controler;
+    module.exports = Controler;

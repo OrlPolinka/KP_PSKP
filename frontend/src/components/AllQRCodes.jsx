@@ -1,29 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Clock, MapPin, User, CheckCircle, Download, RefreshCw, QrCode } from 'lucide-react';
 import api from '../services/api';
+import { formatTime } from '../utils/dateHelpers';
+import Pagination from './common/Pagination';
 
 const AllQRCodes = () => {
     const [qrCodes, setQrCodes] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
 
-    const fetchAllQRCodes = async () => {
+    const fetchAllQRCodes = useCallback(async () => {
         setLoading(true);
         setError(null);
         
         try {
-            const response = await api.get('/bookings/all/qrcodes');
+            const response = await api.get('/bookings/all/qrcodes', { 
+                params: { page: currentPage, limit: 9 } 
+            });
             setQrCodes(response.data.qrCodes || []);
+            if (response.data.pagination) {
+                setTotalPages(response.data.pagination.totalPages);
+            }
         } catch (err) {
             setError(err.response?.data?.error || 'Ошибка при загрузке QR-кодов');
         } finally {
             setLoading(false);
         }
-    };
+    }, [currentPage]);
 
     useEffect(() => {
         fetchAllQRCodes();
-    }, []);
+    }, [currentPage, fetchAllQRCodes]);
+
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+    };
 
     const getStatusBadge = (status, checkedIn, canScan) => {
         if (checkedIn) {
@@ -152,16 +165,25 @@ const AllQRCodes = () => {
                             <div className="qr-info">
                                 <div className="qr-info-item">
                                     <Calendar size={16} />
-                                    {new Date(qrCode.schedule.date).toLocaleDateString('ru-RU', {
-                                        weekday: 'short',
-                                        month: 'short',
-                                        day: 'numeric'
-                                    })}
+                                    {(() => {
+                                        try {
+                                            const date = new Date(qrCode.schedule.date);
+                                            if (isNaN(date.getTime())) {
+                                                return 'Некорректная дата';
+                                            }
+                                            return date.toLocaleDateString('ru-RU', {
+                                                day: '2-digit',
+                                                month: '2-digit',
+                                                year: 'numeric'
+                                            });
+                                        } catch (e) {
+                                            return 'Ошибка даты';
+                                        }
+                                    })()}
                                 </div>
-                                
                                 <div className="qr-info-item">
                                     <Clock size={16} />
-                                    {qrCode.schedule.startTime} - {qrCode.schedule.endTime}
+                                    {formatTime(qrCode.schedule.startTime)} - {formatTime(qrCode.schedule.endTime)}
                                 </div>
                                 
                                 <div className="qr-info-item">
@@ -176,14 +198,26 @@ const AllQRCodes = () => {
                             </div>
                             
                             <div className="qr-preview">
-                                <img 
-                                    src={qrCode.qrImage} 
-                                    alt="QR-код" 
-                                    style={{ 
-                                        opacity: qrCode.checkedIn || !qrCode.canScan ? 0.5 : 1,
-                                        filter: (qrCode.checkedIn || !qrCode.canScan) ? 'grayscale(100%)' : 'none'
-                                    }}
-                                />
+                                {qrCode.qrImage ? (
+                                    <img 
+                                        src={qrCode.qrImage} 
+                                        alt="QR-код" 
+                                        style={{ 
+                                            opacity: qrCode.checkedIn || !qrCode.canScan ? 0.5 : 1,
+                                            filter: (qrCode.checkedIn || !qrCode.canScan) ? 'grayscale(100%)' : 'none'
+                                        }}
+                                        onLoad={() => console.log('QR loaded for booking:', qrCode.bookingId)}
+                                        onError={(e) => {
+                                            console.error('QR load error:', e);
+                                            console.log('QR src length:', qrCode.qrImage?.length);
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="qr-error-placeholder">
+                                        <QrCode size={24} />
+                                        <span>QR-код недоступен</span>
+                                    </div>
+                                )}
                             </div>
                             
                             <div className="qr-download-btn">
@@ -219,6 +253,12 @@ const AllQRCodes = () => {
                     ))}
                 </div>
             )}
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+            />
         </div>
     );
 };

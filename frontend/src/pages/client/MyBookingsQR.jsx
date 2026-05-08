@@ -132,7 +132,23 @@ const MyBookingsQR = () => {
             <button className="close-btn" onClick={closeModal}>✕</button>
             <h2>Ваш QR-код</h2>
             <div className="qr-code-container">
-              <img src={selectedQR.qrImage} alt="QR Code" className="qr-image" />
+              {selectedQR.qrImage ? (
+                <img 
+                  src={selectedQR.qrImage} 
+                  alt="QR Code" 
+                  className="qr-image" 
+                  onLoad={() => console.log('QR image loaded successfully')}
+                  onError={(e) => {
+                    console.error('QR image failed to load:', e);
+                    console.log('QR image src length:', selectedQR.qrImage?.length);
+                  }}
+                />
+              ) : (
+                <div className="qr-error">
+                  <p>QR-код не загружен</p>
+                  <button onClick={() => window.location.reload()}>Обновить</button>
+                </div>
+              )}
             </div>
             <div className="qr-info">
               <p><strong>{selectedQR.booking?.danceStyle}</strong></p>

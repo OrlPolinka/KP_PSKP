@@ -191,7 +191,7 @@ const MembershipTypesManager = () => {
                     )}
                   </td>
                   <td>
-                    <span style={{ fontWeight: '600', color: '#A78BFA' }}>{type.price} ₽</span>
+                    <span style={{ fontWeight: '600', color: '#A78BFA' }}>{type.price} BYN</span>
                   </td>
                   <td>
                     {type.visitCount
@@ -250,7 +250,7 @@ const MembershipTypesManager = () => {
                     placeholder="Краткое описание..." />
                 </div>
                 <div className="form-group">
-                  <label>Цена (₽) *</label>
+                  <label>Цена (BYN) *</label>
                   <input type="number" required min="0" step="0.01" value={formData.price}
                     onChange={e => setFormData({ ...formData, price: e.target.value })}
                     placeholder="3600" />

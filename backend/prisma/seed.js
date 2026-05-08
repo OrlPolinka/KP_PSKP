@@ -57,32 +57,62 @@ async function main() {
     console.log('Создание типов абонементов...');
     await prisma.membershipType.createMany({
         data: [
-            { name: 'Базовое занятие', description: 'Одно посещение любого группового занятия', price: 600, visitCount: 1, durationDays: null, isActive: true },
-            { name: 'Пробная неделя', description: '7 дней безлимита на все групповые занятия', price: 1500, visitCount: null, durationDays: 7, isActive: true },
-            { name: 'Абонемент на 4 занятия', description: '4 занятия в течение 30 дней', price: 2000, visitCount: 4, durationDays: 30, isActive: true },
-            { name: 'Абонемент на 8 занятий', description: '8 занятий в течение 45 дней', price: 3600, visitCount: 8, durationDays: 45, isActive: true },
-            { name: 'Абонемент на 12 занятий', description: '12 занятий в течение 60 дней', price: 5000, visitCount: 12, durationDays: 60, isActive: true },
-            { name: 'Безлимитный на месяц', description: 'Безлимитное посещение всех групповых занятий на 30 дней', price: 4500, visitCount: null, durationDays: 30, isActive: true },
-            { name: 'Безлимитный на 3 месяца', description: 'Безлимитное посещение на 90 дней (экономия 15%)', price: 11500, visitCount: null, durationDays: 90, isActive: true },
-            { name: 'Безлимитный на год', description: 'Годовой абонемент на все групповые занятия (экономия 30%)', price: 38000, visitCount: null, durationDays: 365, isActive: true },
-            { name: 'Персональная тренировка', description: 'Индивидуальное занятие с тренером (1 час)', price: 1500, visitCount: 1, durationDays: null, isActive: true },
-            { name: 'Пакет 5 персональных тренировок', description: '5 индивидуальных занятий со скидкой', price: 6500, visitCount: 5, durationDays: 60, isActive: true }
+            { name: 'Пробное занятие', description: 'Одно пробное занятие для ознакомления с тренером', price: 35, visitCount: 1, durationDays: null, isActive: true },
+            { name: '5 занятий', description: 'Пакет из 5 групповых занятий', price: 120, visitCount: 5, durationDays: 30, isActive: true },
+            { name: '10 занятий', description: 'Пакет из 10 групповых занятий', price: 200, visitCount: 10, durationDays: 60, isActive: true },
+            { name: '20 занятий', description: 'Пакет из 20 групповых занятий', price: 350, visitCount: 20, durationDays: 90, isActive: true },
+            { name: 'Безлимит', description: 'Неограниченное количество посещений в течение месяца', price: 700, visitCount: null, durationDays: 30, isActive: true },
+            { name: 'Безлимитный на 3 месяца', description: 'Безлимитное посещение на 90 дней (экономия 15%)', price: 1900, visitCount: null, durationDays: 90, isActive: true },
+            { name: 'Безлимитный на год', description: 'Годовой абонемент на все групповые занятия (экономия 30%)', price: 6000, visitCount: null, durationDays: 365, isActive: true },
+            { name: 'Персональная тренировка', description: 'Индивидуальное занятие с тренером (1 час)', price: 500, visitCount: 1, durationDays: null, isActive: true },
+            { name: 'Пакет 5 персональных тренировок', description: '5 индивидуальных занятий со скидкой', price: 2000, visitCount: 5, durationDays: 60, isActive: true }
         ]
     });
 
-    // ==================== 5. ПОЛЬЗОВАТЕЛИ ====================
+    // ==================== 5. ОЧИСТКА ДАННЫХ ====================
+    console.log('Очистка некорректных данных...');
+    
+    // Исправляем отрицательные remainingVisits
+    const negativeMemberships = await prisma.membership.findMany({
+        where: {
+            remainingVisits: {
+                lt: 0
+            }
+        }
+    });
+
+    if (negativeMemberships.length > 0) {
+        console.log(`🔧 Исправление ${negativeMemberships.length} абонементов с отрицательными значениями...`);
+        
+        for (const membership of negativeMemberships) {
+            await prisma.membership.update({
+                where: { id: membership.id },
+                data: {
+                    remainingVisits: 0,
+                    status: 'expired'
+                }
+            });
+        }
+        
+        console.log('✅ Отрицательные значения исправлены');
+    }
+
+    // ==================== 6. ПОЛЬЗОВАТЕЛИ ====================
     console.log('Создание пользователей...');
-    const hashedPassword = await bcrypt.hash('123456', 10);
+    // Создаем отдельные хеши для каждого пользователя
+    const adminPassword = await bcrypt.hash('123456', 10);
+    const trainerPassword = await bcrypt.hash('123456', 10);
+    const clientPassword = await bcrypt.hash('123456', 10);
 
     const usersData = [
-        { email: 'admin@dancestudio.ru', password: hashedPassword, role: 'admin', fullName: 'Екатерина Смирнова', phone: '+7(916)123-45-67', isActive: true },
-        { email: 'admin2@dancestudio.ru', password: hashedPassword, role: 'admin', fullName: 'Алексей Волков', phone: '+7(916)234-56-78', isActive: true },
-        { email: 'anna.zubareva@dancestudio.ru', password: hashedPassword, role: 'trainer', fullName: 'Анна Зубарева', phone: '+7(916)345-67-89', isActive: true },
-        { email: 'dmitry.smirnov@dancestudio.ru', password: hashedPassword, role: 'trainer', fullName: 'Дмитрий Смирнов', phone: '+7(916)456-78-90', isActive: true },
-        { email: 'ekaterina.ivanova@dancestudio.ru', password: hashedPassword, role: 'trainer', fullName: 'Екатерина Иванова', phone: '+7(916)567-89-01', isActive: true },
-        { email: 'maria.ivanova@mail.ru', password: hashedPassword, role: 'client', fullName: 'Мария Иванова', phone: '+7(909)111-22-33', isActive: true },
-        { email: 'alexey.petrov@mail.ru', password: hashedPassword, role: 'client', fullName: 'Алексей Петров', phone: '+7(909)222-33-44', isActive: true },
-        { email: 'olga.sidorova@mail.ru', password: hashedPassword, role: 'client', fullName: 'Ольга Сидорова', phone: '+7(909)333-44-55', isActive: true }
+        { email: 'admin@dancestudio.ru', password: adminPassword, role: 'admin', fullName: 'Екатерина Смирнова', phone: '+7(916)123-45-67', isActive: true },
+        { email: 'admin2@dancestudio.ru', password: adminPassword, role: 'admin', fullName: 'Алексей Волков', phone: '+7(916)234-56-78', isActive: true },
+        { email: 'anna.zubareva@dancestudio.ru', password: trainerPassword, role: 'trainer', fullName: 'Анна Зубарева', phone: '+7(916)345-67-89', isActive: true },
+        { email: 'dmitry.smirnov@dancestudio.ru', password: trainerPassword, role: 'trainer', fullName: 'Дмитрий Смирнов', phone: '+7(916)456-78-90', isActive: true },
+        { email: 'ekaterina.ivanova@dancestudio.ru', password: trainerPassword, role: 'trainer', fullName: 'Екатерина Иванова', phone: '+7(916)567-89-01', isActive: true },
+        { email: 'maria.ivanova@mail.ru', password: clientPassword, role: 'client', fullName: 'Мария Иванова', phone: '+7(909)111-22-33', isActive: true },
+        { email: 'alexey.petrov@mail.ru', password: clientPassword, role: 'client', fullName: 'Алексей Петров', phone: '+7(909)222-33-44', isActive: true },
+        { email: 'olga.sidorova@mail.ru', password: clientPassword, role: 'client', fullName: 'Ольга Сидорова', phone: '+7(909)333-44-55', isActive: true }
     ];
 
     await prisma.user.createMany({ data: usersData });
@@ -95,6 +125,12 @@ async function main() {
     const clientMaria = await prisma.user.findUnique({ where: { email: 'maria.ivanova@mail.ru' } });
     const clientAlexey = await prisma.user.findUnique({ where: { email: 'alexey.petrov@mail.ru' } });
     const clientOlga = await prisma.user.findUnique({ where: { email: 'olga.sidorova@mail.ru' } });
+
+    // Проверяем что пользователи найдены
+    if (!admin || !trainerAnna || !trainerDmitry || !trainerEkaterina || !clientMaria || !clientAlexey || !clientOlga) {
+        console.error('❌ Ошибка: Не все пользователи найдены в базе данных');
+        throw new Error('Не все пользователи найдены в базе данных');
+    }
 
     // ==================== 7. ТРЕНЕРЫ ====================
     console.log('Создание профилей тренеров...');
@@ -250,30 +286,40 @@ async function main() {
     console.log('Создание абонементов...');
     
     // Получаем типы абонементов
-    const monthUnlimited = await prisma.membershipType.findFirst({ where: { name: 'Безлимитный на месяц' } });
-    const fourClasses = await prisma.membershipType.findFirst({ where: { name: 'Абонемент на 4 занятия' } });
+    const monthUnlimited = await prisma.membershipType.findFirst({ where: { name: 'Безлимит' } });
+    const fourClasses = await prisma.membershipType.findFirst({ where: { name: '5 занятий' } });
     
-    // Создаем абонементы для клиентов
-    const clients = [clientMaria, clientAlexey, clientOlga];
+    // Получаем первый доступный тип если не находит
+    const firstType = await prisma.membershipType.findFirst();
     
-    for (let i = 0; i < clients.length; i++) {
-        const client = clients[i];
-        const startDate = new Date();
-        const endDate = new Date();
-        endDate.setMonth(endDate.getMonth() + 1);
+    if (!monthUnlimited && !fourClasses && !firstType) {
+        console.log('⚠️ Типы абонементов не найдены, пропускаем создание абонементов');
+    } else {
+        // Создаем абонементы для клиентов
+        const clients = [clientMaria, clientAlexey, clientOlga];
         
-        await prisma.membership.create({
-            data: {
-                clientId: client.id,
-                membershipTypeId: i % 2 === 0 ? monthUnlimited.id : fourClasses.id,
-                startDate: startDate,
-                endDate: endDate,
-                remainingVisits: i % 2 === 0 ? null : 4,
-                status: 'active',
-                purchaseDate: new Date(),
-                pricePaid: i % 2 === 0 ? 4500 : 2000
-            }
-        });
+        for (let i = 0; i < clients.length; i++) {
+            const client = clients[i];
+            const startDate = new Date();
+            const endDate = new Date();
+            endDate.setMonth(endDate.getMonth() + 1);
+            
+            const type1 = monthUnlimited || firstType;
+            const type2 = fourClasses || firstType;
+            
+            await prisma.membership.create({
+                data: {
+                    clientId: client.id,
+                    membershipTypeId: i % 2 === 0 ? type1.id : type2.id,
+                    startDate: startDate,
+                    endDate: endDate,
+                    remainingVisits: i % 2 === 0 ? null : 4,
+                    status: 'active',
+                    purchaseDate: new Date(),
+                    pricePaid: i % 2 === 0 ? 700 : 120
+                }
+            });
+        }
     }
     
     console.log('✅ База данных успешно заполнена!');

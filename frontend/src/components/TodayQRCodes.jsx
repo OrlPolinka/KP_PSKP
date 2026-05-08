@@ -1,11 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, User, CheckCircle, RefreshCw, Sparkles } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, CheckCircle, RefreshCw, Download } from 'lucide-react';
 import api from '../services/api';
+import { formatTime } from '../utils/dateHelpers';
 
 const TodayQRCodes = () => {
     const [qrCodes, setQrCodes] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    const downloadQRCode = async (bookingId, danceStyle) => {
+        try {
+            const response = await api.get(`/bookings/${bookingId}/qrcode/download`, {
+                responseType: 'blob'
+            });
+            
+            // Создаем blob и ссылку для скачивания
+            const blob = new Blob([response.data], { type: 'image/png' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `QR-код_${danceStyle}_${new Date().toISOString().split('T')[0]}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Download error:', err);
+            setError('Ошибка при скачивании QR-кода');
+        }
+    };
 
     const fetchTodayQRCodes = async () => {
         setLoading(true);
@@ -127,7 +150,7 @@ const TodayQRCodes = () => {
                             <div className="qr-info">
                                 <div className="qr-info-item">
                                     <Clock size={16} />
-                                    {qrCode.schedule.startTime} - {qrCode.schedule.endTime}
+                                    {formatTime(qrCode.schedule.startTime)} - {formatTime(qrCode.schedule.endTime)}
                                 </div>
                                 
                                 <div className="qr-info-item">
@@ -153,11 +176,10 @@ const TodayQRCodes = () => {
                             </div>
                             
                             <div className="qr-download-btn">
-                                <a 
-                                    href={`/api/bookings/${qrCode.bookingId}/qrcode/download`}
-                                    download={`qr-code-${qrCode.bookingId}.png`}
+                                <button 
                                     className="btn btn-primary"
                                     disabled={qrCode.checkedIn}
+                                    onClick={() => downloadQRCode(qrCode.bookingId, qrCode.schedule.danceStyle)}
                                 >
                                     {qrCode.checkedIn ? (
                                         <>
@@ -166,11 +188,11 @@ const TodayQRCodes = () => {
                                         </>
                                     ) : (
                                         <>
-                                            <Sparkles size={16} />
+                                            <Download size={16} />
                                             Скачать QR-код
                                         </>
                                     )}
-                                </a>
+                                </button>
                             </div>
                         </div>
                     ))}

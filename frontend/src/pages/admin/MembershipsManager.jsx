@@ -204,7 +204,7 @@ const MembershipsManager = () => {
                     <td>
                       <div style={{ fontWeight: '500', color: 'white' }}>{m.membershipType?.name || '—'}</div>
                       <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
-                        {m.pricePaid != null ? `${m.pricePaid} ₽` : ''}
+                        {m.pricePaid != null ? `${m.pricePaid} BYN` : ''}
                       </div>
                     </td>
                     <td style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>

@@ -566,7 +566,52 @@ async function generateBookingQRCode(req, res) {
             clientId: booking.clientId
         });
 
-        const qrImage = await QRCode.toDataURL(qrData);
+        console.log('Generating QR code for booking:', booking.id);
+        
+        let qrImage;
+        try {
+            // Генерируем QR-код как буфер, затем конвертируем в base64
+            const qrBuffer = await QRCode.toBuffer(qrData, {
+                errorCorrectionLevel: 'M',
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                },
+                width: 300
+            });
+            
+            // Конвертируем буфер в base64 DataURL
+            const base64 = qrBuffer.toString('base64');
+            qrImage = `data:image/png;base64,${base64}`;
+            
+            console.log('QR code generated successfully, buffer size:', qrBuffer.length, 'base64 length:', qrImage.length);
+        } catch (qrError) {
+            console.error('QR code generation error:', qrError);
+            return res.status(500).json({ error: 'Ошибка при генерации QR-кода' });
+        }
+
+        // Форматируем дату для клиента
+        const formatDateForClient = (dateValue) => {
+            if (!dateValue) return '';
+            
+            let dateObj;
+            if (typeof dateValue === 'string') {
+                dateObj = new Date(dateValue);
+            } else {
+                dateObj = dateValue;
+            }
+            
+            if (isNaN(dateObj.getTime())) {
+                return '';
+            }
+            
+            return dateObj.toLocaleDateString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit', 
+                year: 'numeric'
+            });
+        };
 
         res.json({
             success: true,
@@ -575,7 +620,7 @@ async function generateBookingQRCode(req, res) {
             booking: {
                 id: booking.id,
                 schedule: {
-                    date: booking.schedule.date,
+                    date: formatDateForClient(booking.schedule.date),
                     startTime: booking.schedule.startTime,
                     danceStyle: booking.schedule.danceStyle.name,
                     trainer: booking.schedule.trainer?.user?.fullName
@@ -595,7 +640,28 @@ async function getTodayQRCodes(req, res) {
     try {
         const { id: userId } = req.user;
         const today = getDateString(new Date());
-
+        
+        // Автоудаление QR-кодов старше вчерашнего дня
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setHours(23, 59, 59, 999);
+        
+        await prisma.booking.updateMany({
+            where: {
+                clientId: userId,
+                qrCode: { not: null },
+                schedule: {
+                    date: {
+                        lt: yesterday.toISOString()
+                    }
+                }
+            },
+            data: {
+                qrCode: null,
+                qrCodeGenerated: null
+            }
+        });
+        
         const bookings = await prisma.booking.findMany({
             where: {
                 clientId: userId,
@@ -616,9 +682,10 @@ async function getTodayQRCodes(req, res) {
                     }
                 }
             },
-            orderBy: {
-                schedule: { startTime: 'asc' }
-            }
+            orderBy: [
+                { schedule: { date: 'desc' } },
+                { schedule: { startTime: 'desc' } }
+            ]
         });
 
         const qrCodes = [];
@@ -646,14 +713,80 @@ async function getTodayQRCodes(req, res) {
 
             const qrImage = await QRCode.toDataURL(qrData);
 
+            // Форматируем дату
+            const formatDate = (dateValue) => {
+                if (!dateValue) return '';
+                
+                let dateObj;
+                if (typeof dateValue === 'string') {
+                    dateObj = new Date(dateValue);
+                } else {
+                    dateObj = dateValue;
+                }
+                
+                if (isNaN(dateObj.getTime())) {
+                    return '';
+                }
+                
+                return dateObj.toLocaleDateString('ru-RU', {
+                    day: '2-digit',
+                    month: '2-digit', 
+                    year: 'numeric'
+                });
+            };
+
+            // Форматируем время
+            const formatTime = (timeValue) => {
+                if (!timeValue) return '';
+                
+                // Если время в формате ISO string, парсим его
+                if (typeof timeValue === 'string') {
+                    // Если это ISO строка с датой, извлекаем только время
+                    if (timeValue.includes('T')) {
+                        const timePart = timeValue.split('T')[1];
+                        if (timePart && timePart.length > 5) {
+                            return timePart.substring(0, 5);
+                        }
+                    }
+                    // Если время в формате "HH:MM:SS", обрезаем секунды
+                    if (timeValue.length > 5) {
+                        return timeValue.substring(0, 5);
+                    }
+                    return timeValue;
+                }
+                
+                return timeValue;
+            };
+
+            // Простое форматирование времени
+            const formatTimeSimple = (timeValue) => {
+                if (!timeValue) return '';
+                
+                // Если это ISO строка, извлекаем время
+                if (typeof timeValue === 'string' && timeValue.includes('T')) {
+                    const timeStr = timeValue.split('T')[1];
+                    if (timeStr && timeStr.length >= 5) {
+                        return timeStr.substring(0, 5);
+                    }
+                    return '';
+                }
+                
+                // Если обычная строка времени
+                if (typeof timeValue === 'string' && timeValue.length > 5) {
+                    return timeValue.substring(0, 5);
+                }
+                
+                return timeValue;
+            };
+
             qrCodes.push({
                 bookingId: booking.id,
                 qrCode: qrCode,
                 qrImage: qrImage,
                 schedule: {
-                    date: booking.schedule.date,
-                    startTime: booking.schedule.startTime,
-                    endTime: booking.schedule.endTime,
+                    date: formatDate(booking.schedule.date),
+                    startTime: formatTimeSimple(booking.schedule.startTime),
+                    endTime: formatTimeSimple(booking.schedule.endTime),
                     danceStyle: booking.schedule.danceStyle.name,
                     trainer: booking.schedule.trainer?.user?.fullName,
                     hall: booking.schedule.hall.name
@@ -736,6 +869,61 @@ async function verifyBookingQRCode(req, res) {
             });
         }
 
+        // Форматируем дату и время для корректного отображения
+        const scheduleDateTime = combineDateAndTime(booking.schedule.date, booking.schedule.startTime);
+        
+        // Форматируем дату в читаемый формат
+        const formatDate = (dateValue) => {
+            if (!dateValue) return '';
+            
+            // Если дата уже строка, парсим ее
+            let dateObj;
+            if (typeof dateValue === 'string') {
+                dateObj = new Date(dateValue);
+            } else {
+                dateObj = dateValue;
+            }
+            
+            // Проверяем что дата валидная
+            if (isNaN(dateObj.getTime())) {
+                return '';
+            }
+            
+            return dateObj.toLocaleDateString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit', 
+                year: 'numeric'
+            });
+        };
+        
+        // Форматируем время в читаемый формат
+        const formatTime = (timeValue) => {
+            if (!timeValue) return '';
+            
+            // Если время уже в нужном формате
+            if (typeof timeValue === 'string') {
+                // Если время в формате "HH:MM:SS", обрезаем секунды
+                if (timeValue.length > 5) {
+                    return timeValue.substring(0, 5);
+                }
+                return timeValue;
+            }
+            
+            // Если время это Date объект, форматируем его
+            if (timeValue instanceof Date) {
+                return timeValue.toLocaleTimeString('ru-RU', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+            
+            return '';
+        };
+        
+        const formattedDate = formatDate(booking.schedule.date);
+        const formattedStartTime = formatTime(booking.schedule.startTime);
+        const formattedEndTime = formatTime(booking.schedule.endTime);
+
         res.json({
             success: true,
             valid: true,
@@ -743,9 +931,9 @@ async function verifyBookingQRCode(req, res) {
                 id: booking.id,
                 client: booking.client,
                 schedule: {
-                    date: booking.schedule.date,
-                    startTime: booking.schedule.startTime,
-                    endTime: booking.schedule.endTime,
+                    date: formattedDate,
+                    startTime: formattedStartTime,
+                    endTime: formattedEndTime,
                     danceStyle: booking.schedule.danceStyle,
                     hall: booking.schedule.hall
                 },
@@ -825,6 +1013,20 @@ async function downloadQRCode(req, res) {
 async function getAllQRCodes(req, res) {
     try {
         const { id: userId } = req.user;
+        const { page = 1, limit = 10 } = req.query;
+
+        // Пагинация
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const take = parseInt(limit);
+
+        // Получаем общее количество записей для пагинации
+        const total = await prisma.booking.count({
+            where: {
+                clientId: userId,
+                status: { not: 'cancelled' },
+                qrCode: { not: null }
+            }
+        });
 
         const bookings = await prisma.booking.findMany({
             where: {
@@ -832,6 +1034,8 @@ async function getAllQRCodes(req, res) {
                 status: { not: 'cancelled' },
                 qrCode: { not: null }
             },
+            skip,
+            take,
             include: {
                 schedule: {
                     include: {
@@ -854,7 +1058,8 @@ async function getAllQRCodes(req, res) {
             }
         });
 
-        const qrCodes = bookings.map(booking => {
+        const qrCodes = [];
+        for (const booking of bookings) {
             const scheduleDate = new Date(booking.schedule.date);
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -866,28 +1071,124 @@ async function getAllQRCodes(req, res) {
                            booking.status !== 'no_show' &&
                            scheduleDate >= today;
 
-            return {
+            // Форматируем дату
+            const formatDate = (dateValue) => {
+                if (!dateValue) return '';
+                
+                let dateObj;
+                if (typeof dateValue === 'string') {
+                    dateObj = new Date(dateValue);
+                } else {
+                    dateObj = dateValue;
+                }
+                
+                if (isNaN(dateObj.getTime())) {
+                    return '';
+                }
+                
+                return dateObj.toLocaleDateString('ru-RU', {
+                    day: '2-digit',
+                    month: '2-digit', 
+                    year: 'numeric'
+                });
+            };
+
+            // Форматируем время
+            const formatTime = (timeValue) => {
+                if (!timeValue) return '';
+                
+                // Если время в формате ISO string, парсим его
+                if (typeof timeValue === 'string') {
+                    // Если это ISO строка с датой, извлекаем только время
+                    if (timeValue.includes('T')) {
+                        const timePart = timeValue.split('T')[1];
+                        if (timePart && timePart.length > 5) {
+                            return timePart.substring(0, 5);
+                        }
+                    }
+                    // Если время в формате "HH:MM:SS", обрезаем секунды
+                    if (timeValue.length > 5) {
+                        return timeValue.substring(0, 5);
+                    }
+                    return timeValue;
+                }
+                
+                return timeValue;
+            };
+
+            // Простое форматирование времени
+            const formatTimeSimple = (timeValue) => {
+                if (!timeValue) return '';
+                
+                // Если это ISO строка, извлекаем время
+                if (typeof timeValue === 'string' && timeValue.includes('T')) {
+                    const timeStr = timeValue.split('T')[1];
+                    if (timeStr && timeStr.length >= 5) {
+                        return timeStr.substring(0, 5);
+                    }
+                    return '';
+                }
+                
+                // Если обычная строка времени
+                if (typeof timeValue === 'string' && timeValue.length > 5) {
+                    return timeValue.substring(0, 5);
+                }
+                
+                return timeValue;
+            };
+
+            // Генерируем изображение QR-кода
+            let qrImage;
+            try {
+                const qrData = JSON.stringify({
+                    bookingId: booking.id,
+                    qrCode: booking.qrCode,
+                    scheduleId: booking.scheduleId,
+                    clientId: booking.clientId
+                });
+                
+                const qrBuffer = await QRCode.toBuffer(qrData, {
+                    errorCorrectionLevel: 'M',
+                    margin: 2,
+                    color: { dark: '#000000', light: '#FFFFFF' },
+                    width: 300
+                });
+                
+                const base64 = qrBuffer.toString('base64');
+                qrImage = `data:image/png;base64,${base64}`;
+            } catch (qrError) {
+                console.error('QR code generation error:', qrError);
+                qrImage = null;
+            }
+
+            qrCodes.push({
                 bookingId: booking.id,
                 qrCode: booking.qrCode,
-                qrImage: `/api/bookings/${booking.id}/qrcode`,
+                qrImage: qrImage,
                 status: booking.status,
                 checkedIn: booking.checkedIn,
                 qrCodeScanned: booking.qrCodeScanned,
                 canScan,
                 schedule: {
-                    date: booking.schedule.date,
-                    startTime: booking.schedule.startTime,
-                    endTime: booking.schedule.endTime,
+                    date: formatDate(booking.schedule.date),
+                    startTime: formatTimeSimple(booking.schedule.startTime),
+                    endTime: formatTimeSimple(booking.schedule.endTime),
                     danceStyle: booking.schedule.danceStyle.name,
                     trainer: booking.schedule.trainer.user.fullName,
                     hall: booking.schedule.hall.name
                 }
-            };
-        });
+            });
+        }
 
         res.json({
             success: true,
-            qrCodes
+            qrCodes,
+            pagination: {
+                total,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages: Math.ceil(total / parseInt(limit))
+            }
         });
     } catch (error) {
         console.error('getAllQRCodes error:', error);

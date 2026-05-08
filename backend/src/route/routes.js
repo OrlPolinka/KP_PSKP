@@ -51,6 +51,7 @@ const routes = [
     //авторизация/регистрация
     {method: 'post',               path: '/auth/register',                         action: 'register',            public: true},
     {method: 'post',               path: '/auth/login',                            action: 'login',               public: true},
+    {method: 'post',               path: '/auth/change-password',                   action: 'changePassword'},
     {method: 'get',                path: '/auth/me',                               action: 'getMe'},
 
     //пользователи(админ)

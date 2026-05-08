@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import api from '../../services/api';
+import Pagination from '../../components/common/Pagination';
 
 const statusConfig = {
   active: { label: 'Активен', badge: 'badge-success', icon: '✅' },
@@ -60,7 +61,7 @@ const MembershipCard = ({ membership, onPause }) => {
         <InfoItem icon="⏳" label="Действует до" value={
           endDate ? endDate.toLocaleDateString('ru-RU') : 'Бессрочно'
         } />
-        <InfoItem icon="💰" label="Оплачено" value={`${membership.pricePaid} ₽`} />
+        <InfoItem icon="💰" label="Оплачено" value={`${membership.pricePaid} BYN`} />
       </div>
 
       {membership.status === 'paused' && membership.pausedUntil && (
@@ -154,7 +155,7 @@ const BuyModal = ({ type, onClose, onBuy }) => {
           )}
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '28px', fontWeight: '800', color: '#A78BFA' }}>
-              {type.price} ₽
+              {type.price} BYN
             </span>
             {type.visitCount && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>
@@ -182,7 +183,7 @@ const BuyModal = ({ type, onClose, onBuy }) => {
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose}>Отмена</button>
           <button className="btn btn-primary" onClick={handleBuy} disabled={buying}>
-            {buying ? '⏳ Оформление...' : `Купить за ${type.price} ₽`}
+            {buying ? '⏳ Оформление...' : `Купить за ${type.price} BYN`}
           </button>
         </div>
       </div>
@@ -196,25 +197,34 @@ const MyMemberships = () => {
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
   const [buyModal, setBuyModal] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [activeTab, setActiveTab] = useState('my'); // 'my' | 'buy'
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [membershipsRes, typesRes] = await Promise.all([
-        api.get('/memberships'),
+        api.get('/memberships', { params: { page: currentPage, limit: 10 } }),
         api.get('/membership-types'),
       ]);
       setMemberships(membershipsRes.data.memberships || []);
       setTypes(typesRes.data.membershipTypes || []);
+      if (membershipsRes.data.pagination) {
+        setTotalPages(membershipsRes.data.pagination.totalPages);
+      }
     } catch (error) {
       console.error('Ошибка загрузки:', error);
     } finally {
       setLoading(false);
     }
+  }, [currentPage]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
   };
 
   const handleBuy = async (typeId, startDate) => {
@@ -353,11 +363,19 @@ const MyMemberships = () => {
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {filteredMemberships.map(m => (
-                <MembershipCard key={m.id} membership={m} onPause={handlePause} />
-              ))}
-            </div>
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {filteredMemberships.map(m => (
+                  <MembershipCard key={m.id} membership={m} onPause={handlePause} />
+                ))}
+              </div>
+
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+              />
+            </>
           )}
         </>
       )}
@@ -420,7 +438,7 @@ const MyMemberships = () => {
                       WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                       backgroundClip: 'text',
                     }}>
-                      {type.price} ₽
+                      {type.price} BYN
                     </span>
                     <button
                       className="btn btn-primary"

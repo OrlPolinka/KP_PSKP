@@ -444,12 +444,36 @@ const Profile = () => {
               <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   className="btn btn-primary btn-sm"
-                  onClick={() => {
+                  onClick={async () => {
                     if (passwordData.newPass !== passwordData.confirm) {
                       setMessage({ type: 'error', text: 'Пароли не совпадают' });
                       return;
                     }
-                    setMessage({ type: 'info', text: 'Смена пароля: обратитесь к администратору или используйте API' });
+                    if (!passwordData.current) {
+                      setMessage({ type: 'error', text: 'Введите текущий пароль' });
+                      return;
+                    }
+                    if (passwordData.newPass.length < 6) {
+                      setMessage({ type: 'error', text: 'Новый пароль должен содержать минимум 6 символов' });
+                      return;
+                    }
+                    
+                    try {
+                      const response = await api.post('/auth/change-password', {
+                        currentPassword: passwordData.current,
+                        newPassword: passwordData.newPass
+                      });
+                      
+                      if (response.data.success) {
+                        setMessage({ type: 'success', text: 'Пароль успешно изменен!' });
+                        setPasswordData({ current: '', newPass: '', confirm: '' });
+                        setShowPasswordForm(false);
+                      } else {
+                        setMessage({ type: 'error', text: response.data.error || 'Ошибка при смене пароля' });
+                      }
+                    } catch (error) {
+                      setMessage({ type: 'error', text: error.response?.data?.error || 'Ошибка при смене пароля' });
+                    }
                   }}
                 >
                   Сохранить пароль
