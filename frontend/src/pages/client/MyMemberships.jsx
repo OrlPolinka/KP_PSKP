@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import api from '../../services/api';
 import Pagination from '../../components/common/Pagination';
+import PaymentForm from '../../components/PaymentForm';
+import './MyMemberships.css';
 
 const statusConfig = {
   active: { label: 'Активен', badge: 'badge-success', icon: '✅' },
@@ -118,17 +120,59 @@ const InfoItem = ({ icon, label, value, highlight }) => (
 
 const BuyModal = ({ type, onClose, onBuy }) => {
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [buying, setBuying] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
 
   const handleBuy = async () => {
-    setBuying(true);
+    setShowPayment(true);
+  };
+
+  const handlePaymentSuccess = async (paymentData) => {
     try {
-      await onBuy(type.id, startDate);
+      console.log('Creating membership with data:', {
+        membershipTypeId: type.id,
+        startDate,
+        paymentId: paymentData.paymentId
+      });
+      
+      // Создаем абонемент после успешной оплаты
+      await api.post('/memberships', {
+        membershipTypeId: type.id,
+        startDate,
+        paymentId: paymentData.paymentId
+      });
+      
+      setShowPayment(false);
       onClose();
-    } finally {
-      setBuying(false);
+      
+      // Обновляем список абонементов
+      window.location.reload();
+    } catch (error) {
+      console.error('Error creating membership:', error);
+      console.error('Error details:', error.response?.data);
+      alert('Ошибка при приобретении абонемента');
     }
   };
+
+  if (showPayment) {
+    return (
+      <div className="modal-overlay" onClick={() => setShowPayment(false)}>
+        <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal-header">
+            <h2 className="modal-title">Оплата абонемента</h2>
+            <button className="modal-close" onClick={() => setShowPayment(false)}>×</button>
+          </div>
+          
+          <PaymentForm
+            membershipId={type.id}
+            amount={type.price}
+            membershipName={type.name}
+            onSuccess={handlePaymentSuccess}
+            onCancel={() => setShowPayment(false)}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -167,9 +211,30 @@ const BuyModal = ({ type, onClose, onBuy }) => {
                 📅 {type.durationDays} дней
               </div>
             )}
+            {!type.visitCount && !type.durationDays && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>
+                ∞ Безлимит
+              </div>
+            )}
           </div>
         </div>
 
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{
+            fontSize: '28px', fontWeight: '800',
+            background: 'linear-gradient(135deg, #A78BFA, #EC4899)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}>
+            {type.price} BYN
+          </span>
+          <button
+            className="btn btn-primary"
+            onClick={handleBuy}
+          >
+            Оплатить
+          </button>
+        </div>
         <div className="form-group">
           <label>Дата начала</label>
           <input
@@ -182,9 +247,6 @@ const BuyModal = ({ type, onClose, onBuy }) => {
 
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose}>Отмена</button>
-          <button className="btn btn-primary" onClick={handleBuy} disabled={buying}>
-            {buying ? '⏳ Оформление...' : `Купить за ${type.price} BYN`}
-          </button>
         </div>
       </div>
     </div>

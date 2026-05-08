@@ -117,8 +117,9 @@ function validateDateTimeNotPast(dateTime, fieldName = 'дата и время')
     
     const inputDateTime = new Date(dateTime);
     const now = new Date();
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     
-    if (inputDateTime < now) {
+    if (inputDateTime < yesterday) {
         return { valid: false, error: `${fieldName} не могут быть в прошлом` };
     }
     
@@ -1645,6 +1646,13 @@ class Controler{
                 membershipTypeId
             } = req.body;
 
+            console.log('Creating membership with data:', {
+                membershipTypeId,
+                userId,
+                role,
+                body: req.body
+            });
+
             if(!membershipTypeId){
                 return res.status(400).json({
                     error: 'Выберите тип абонемента'
@@ -1654,6 +1662,8 @@ class Controler{
             let membershipType = await prisma.membershipType.findUnique({
                 where: {id: membershipTypeId}
             });
+
+            console.log('Found membership type:', membershipType);
 
             if(!membershipType){
                 return res.status(404).json({
@@ -1759,7 +1769,7 @@ class Controler{
         }
         catch(error){
             console.error('createMembership error:', error);
-            res.status(500).json({error: 'Ошибка при создании абонемента'});
+            res.status(500).json({error: 'Ошибка при приобретении абонемента'});
         }
     }
 

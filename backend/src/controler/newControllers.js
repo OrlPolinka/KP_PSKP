@@ -1641,7 +1641,7 @@ async function createPayment(req, res) {
         });
     } catch (error) {
         console.error('createPayment error:', error);
-        res.status(500).json({ error: 'Ошибка при создании платежа' });
+        res.status(500).json({ error: 'Ошибка при приобретении абонемента' });
     }
 }
 
@@ -1753,39 +1753,38 @@ async function getPaymentHistory(req, res) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 module.exports = {
-    // Тренеры
+    // Профили тренеров
     getPublicTrainers,
     getPublicTrainerById,
     updateTrainerProfile,
-
+    
     // Стили танцев
     getDanceStylesDetailed,
     getDanceStyleById,
     updateDanceStyleDetailed,
-
-    // Информация о подготовке
+    
+    // Информация о подготовке к тренировкам
     getTrainingInfo,
     createTrainingInfo,
     updateTrainingInfo,
     deleteTrainingInfo,
-
+    
     // QR-коды
     generateBookingQRCode,
     downloadQRCode,
-    verifyBookingQRCode,
     getTodayQRCodes,
     getAllQRCodes,
+    verifyBookingQRCode,
     markAttendanceByQRCode,
-
+    
     // Уведомления
     getNotifications,
     markNotificationRead,
     markAllNotificationsRead,
-    createNotification,
-
+    
     // Отмена занятия тренером
     cancelScheduleByTrainer,
-
+    
     // Платежи
     createPayment,
     paymentWebhook,
