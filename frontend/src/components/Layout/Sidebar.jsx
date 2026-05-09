@@ -59,7 +59,6 @@ const Sidebar = () => {
           { path: '/admin/dance-styles', icon: '💃', label: 'Стили танцев' },
           { path: '/admin/training-info', icon: '📚', label: 'Информация' },
           { path: '/admin/analytics', icon: '📈', label: 'Аналитика' },
-          { path: '/admin/payments', icon: '💰', label: 'Платежи' },
           { path: '/chat', icon: '💬', label: 'Чат', badge: unreadTotal },
         ];
       case 'trainer':

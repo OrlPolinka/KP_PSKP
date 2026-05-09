@@ -4212,37 +4212,24 @@ class Controler{
             let contacts = [];
 
             if (role === 'client') {
-                // Клиент видит тренеров, у которых есть записи
-                const bookings = await prisma.booking.findMany({
-                    where: { clientId: userId, status: { not: 'cancelled' } },
+                // Клиент видит всех активных тренеров
+                const trainers = await prisma.trainer.findMany({
+                    where: { 
+                        user: { isActive: true }
+                    },
                     include: {
-                        schedule: {
-                            include: {
-                                trainer: {
-                                    include: {
-                                        user: { select: { id: true, fullName: true, photoUrl: true, role: true, isActive: true } }
-                                    }
-                                }
-                            }
-                        }
+                        user: { select: { id: true, fullName: true, photoUrl: true, role: true, isActive: true } }
                     }
                 });
 
-                const trainerMap = new Map();
-                for (const b of bookings) {
-                    const trainerUser = b.schedule?.trainer?.user;
-                    if (trainerUser && !trainerMap.has(trainerUser.id)) {
-                        trainerMap.set(trainerUser.id, {
-                            id: trainerUser.id,
-                            fullName: trainerUser.fullName,
-                            photoUrl: trainerUser.photoUrl,
-                            role: trainerUser.role,
-                            isActive: trainerUser.isActive,
-                            specialization: b.schedule?.trainer?.specialization || null,
-                        });
-                    }
-                }
-                contacts = Array.from(trainerMap.values());
+                contacts = trainers.map(trainer => ({
+                    id: trainer.user.id,
+                    fullName: trainer.user.fullName,
+                    photoUrl: trainer.user.photoUrl,
+                    role: trainer.user.role,
+                    isActive: trainer.user.isActive,
+                    specialization: trainer.specialization || null,
+                }));
 
             } else if (role === 'trainer') {
                 // Тренер видит клиентов, которые записаны на его занятия
