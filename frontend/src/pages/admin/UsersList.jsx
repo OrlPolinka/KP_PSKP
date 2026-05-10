@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { userService } from '../../services/userService';
 import UserProfileModal from '../../components/common/UserProfileModal';
+import CreateTrainerModal from '../../components/common/CreateTrainerModal';
 
 const roleConfig = {
   admin: { label: 'Администратор', badge: 'badge-warning', icon: '👑' },
@@ -18,6 +19,7 @@ const UsersList = () => {
   const [message, setMessage] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [profileModal, setProfileModal] = useState(null);
+  const [createTrainerModal, setCreateTrainerModal] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -102,6 +104,13 @@ const UsersList = () => {
           <h1 className="page-title">Пользователи</h1>
           <p className="page-subtitle">Управление всеми пользователями системы</p>
         </div>
+        <button 
+          className="btn btn-primary" 
+          onClick={() => setCreateTrainerModal(true)}
+          style={{ background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)' }}
+        >
+          ➕ Добавить тренера
+        </button>
       </div>
 
       {message && (
@@ -291,6 +300,16 @@ const UsersList = () => {
         </div>
       )}
       {profileModal && <UserProfileModal userId={profileModal} onClose={() => setProfileModal(null)} />}
+      {createTrainerModal && (
+        <CreateTrainerModal 
+          onClose={() => setCreateTrainerModal(false)}
+          onTrainerCreated={() => {
+            setCreateTrainerModal(false);
+            fetchUsers();
+            showMsg('success', 'Тренер успешно создан');
+          }}
+        />
+      )}
     </div>
   );
 };

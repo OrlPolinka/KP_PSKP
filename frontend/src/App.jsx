@@ -34,7 +34,6 @@ import QRScannerPage from './pages/trainer/QRScannerPage';
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UsersList from './pages/admin/UsersList';
-import TrainersList from './pages/admin/TrainersList';
 import ScheduleManager from './pages/admin/ScheduleManager';
 import MembershipTypesManager from './pages/admin/MembershipTypesManager';
 import MembershipsManager from './pages/admin/MembershipsManager';
@@ -90,7 +89,6 @@ const AppRoutes = () => {
           {/* Admin Routes */}
           <Route path="/admin/dashboard" element={<RoleRoute allowedRoles={['admin']}><AdminDashboard /></RoleRoute>} />
           <Route path="/admin/users" element={<RoleRoute allowedRoles={['admin']}><UsersList /></RoleRoute>} />
-          <Route path="/admin/trainers" element={<RoleRoute allowedRoles={['admin']}><TrainersList /></RoleRoute>} />
           <Route path="/admin/schedule" element={<RoleRoute allowedRoles={['admin']}><ScheduleManager /></RoleRoute>} />
           <Route path="/admin/membership-types" element={<RoleRoute allowedRoles={['admin']}><MembershipTypesManager /></RoleRoute>} />
           <Route path="/admin/memberships" element={<RoleRoute allowedRoles={['admin']}><MembershipsManager /></RoleRoute>} />

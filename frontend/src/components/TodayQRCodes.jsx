@@ -35,21 +35,15 @@ const TodayQRCodes = () => {
         setError(null);
         
         try {
-            console.log('Fetching today QR codes...');
             const response = await api.get('/bookings/today/qrcodes');
-            console.log('QR codes response:', response.data);
             
             if (!response.data || !response.data.qrCodes) {
-                console.error('Invalid response structure:', response.data);
                 setError('Некорректный ответ сервера');
                 return;
             }
             
-            console.log('Setting QR codes:', response.data.qrCodes.length, 'codes');
             setQrCodes(response.data.qrCodes);
         } catch (err) {
-            console.error('Fetch QR codes error:', err);
-            console.error('Error response:', err.response?.data);
             setError(err.response?.data?.error || 'Ошибка при загрузке QR-кодов');
         } finally {
             setLoading(false);

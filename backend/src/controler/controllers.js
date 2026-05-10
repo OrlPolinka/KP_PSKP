@@ -471,6 +471,7 @@ class Controler{
                 return res.status(403).json({error: 'Нельзя удалить администратора'});
             }
 
+            // Простое удаление пользователя
             let user = await prisma.user.delete({
                 where: {id}
             });

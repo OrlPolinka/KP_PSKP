@@ -17,15 +17,11 @@ const MyBookingsQR = () => {
   const fetchBookings = async () => {
     try {
       setLoading(true);
-      console.log('Fetching bookings...');
       const response = await api.get('/bookings', {
         params: { status: 'booked' }
       });
       
-      console.log('Bookings response:', response.data);
-      
       if (!response.data || !response.data.bookings) {
-        console.error('Invalid response structure:', response.data);
         setError('Некорректный ответ сервера');
         return;
       }
@@ -34,16 +30,11 @@ const MyBookingsQR = () => {
       const now = new Date();
       const upcomingBookings = (response.data.bookings || []).filter(booking => {
         const scheduleDate = new Date(booking.schedule?.date);
-        return scheduleDate >= now.setHours(0, 0, 0, 0);
+        return scheduleDate >= now.setHours(0, 0, 0);
       });
-      
-      console.log('Upcoming bookings:', upcomingBookings.length);
-      console.log('Filtered bookings:', upcomingBookings);
       
       setBookings(upcomingBookings);
     } catch (err) {
-      console.error('Ошибка при загрузке записей:', err);
-      console.error('Error response:', err.response?.data);
       setError(err.response?.data?.error || 'Не удалось загрузить записи');
     } finally {
       setLoading(false);

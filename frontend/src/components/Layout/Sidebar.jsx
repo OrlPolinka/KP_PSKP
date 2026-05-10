@@ -52,7 +52,6 @@ const Sidebar = () => {
         return [
           { path: '/admin/dashboard', icon: '📊', label: 'Дашборд' },
           { path: '/admin/users', icon: '👥', label: 'Пользователи' },
-          { path: '/admin/trainers', icon: '🧑‍🏫', label: 'Тренеры' },
           { path: '/admin/schedule', icon: '📅', label: 'Расписание' },
           { path: '/admin/membership-types', icon: '🎫', label: 'Типы абонементов' },
           { path: '/admin/memberships', icon: '💳', label: 'Абонементы клиентов' },

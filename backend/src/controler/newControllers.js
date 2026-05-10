@@ -666,7 +666,10 @@ async function getTodayQRCodes(req, res) {
             where: {
                 clientId: userId,
                 schedule: {
-                    date: new Date(today),
+                    date: {
+                        gte: new Date(today + 'T00:00:00.000Z'),
+                        lt: new Date(today + 'T23:59:59.999Z')
+                    },
                     status: { not: 'cancelled' }
                 },
                 status: { in: ['booked', 'attended'] }
