@@ -251,19 +251,11 @@ const DanceStylesManager = () => {
               
               <div className="form-row">
                 <div className="form-group">
-                  <label>URL видео</label>
+                  <label>Видео</label>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                    <input 
-                      name="videoUrl" 
-                      value={formData.videoUrl.startsWith('data:') ? '(загружено с компьютера)' : formData.videoUrl} 
-                      onChange={e => setFormData(prev => ({ ...prev, videoUrl: e.target.value }))}
-                      placeholder="https://... или выберите файл"
-                      style={{ flex: 1, minWidth: '200px' }}
-                      readOnly={formData.videoUrl.startsWith('data:')}
-                    />
                     <button type="button" className="add-btn" onClick={() => videoFileRef.current?.click()}
                       style={{ whiteSpace: 'nowrap', background: 'rgba(139,92,246,0.15)', color: 'var(--primary-light)' }}>
-                      🎬 Файл
+                      🎬 Выбрать видео с компьютера
                     </button>
                     {formData.videoUrl && (
                       <button type="button" className="remove-btn" onClick={() => setFormData(prev => ({ ...prev, videoUrl: '' }))}>✕</button>
@@ -277,19 +269,11 @@ const DanceStylesManager = () => {
                   )}
                 </div>
                 <div className="form-group">
-                  <label>URL изображения</label>
+                  <label>Изображение</label>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                    <input 
-                      name="imageUrl" 
-                      value={formData.imageUrl.startsWith('data:') ? '(загружено с компьютера)' : formData.imageUrl} 
-                      onChange={e => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
-                      placeholder="https://... или выберите файл"
-                      style={{ flex: 1, minWidth: '200px' }}
-                      readOnly={formData.imageUrl.startsWith('data:')}
-                    />
                     <button type="button" className="add-btn" onClick={() => imageFileRef.current?.click()}
                       style={{ whiteSpace: 'nowrap', background: 'rgba(139,92,246,0.15)', color: 'var(--primary-light)' }}>
-                      📁 Файл
+                      📁 Выбрать изображение с компьютера
                     </button>
                     {formData.imageUrl && (
                       <button type="button" className="remove-btn" onClick={() => setFormData(prev => ({ ...prev, imageUrl: '' }))}>✕</button>

@@ -312,7 +312,6 @@ const Profile = () => {
         {[
           { key: 'info', label: '👤 Информация' },
           ...(profile?.role === 'client' ? [{ key: 'memberships', label: '🎫 Абонементы' }] : []),
-          ...(profile?.role === 'trainer' ? [{ key: 'trainer', label: '🏋️ Тренер' }] : []),
         ].map(tab => (
           <button
             key={tab.key}
@@ -522,44 +521,7 @@ const Profile = () => {
         </div>
       )}
 
-      {activeTab === 'trainer' && profile?.trainerInfo?.[0] && (
-        <div className="card">
-          <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'white', marginBottom: '20px' }}>
-            Информация тренера
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            <div>
-              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Специализация
-              </div>
-              <div style={{ fontSize: '15px', color: 'white' }}>
-                {profile.trainerInfo[0].specialization || '—'}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Дата найма
-              </div>
-              <div style={{ fontSize: '15px', color: 'white' }}>
-                {profile.trainerInfo[0].hireDate
-                  ? new Date(profile.trainerInfo[0].hireDate).toLocaleDateString('ru-RU')
-                  : '—'}
-              </div>
-            </div>
-            {profile.trainerInfo[0].bio && (
-              <div style={{ gridColumn: '1 / -1' }}>
-                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  О себе
-                </div>
-                <div style={{ fontSize: '15px', color: 'rgba(255,255,255,0.8)', lineHeight: '1.6' }}>
-                  {profile.trainerInfo[0].bio}
-                </div>
-              </div>
-            )}
           </div>
-        </div>
-      )}
-    </div>
   );
 };
 

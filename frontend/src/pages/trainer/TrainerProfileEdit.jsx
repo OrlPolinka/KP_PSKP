@@ -342,18 +342,9 @@ const TrainerProfileEdit = () => {
           <div className="form-group">
             <label>Фото профиля</label>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-              <input
-                type="text"
-                name="photoUrl"
-                value={formData.photoUrl.startsWith('data:') ? '(загружено с компьютера)' : formData.photoUrl}
-                onChange={e => setFormData(prev => ({ ...prev, photoUrl: e.target.value }))}
-                placeholder="https://... или выберите файл"
-                style={{ flex: 1, minWidth: '200px' }}
-                readOnly={formData.photoUrl.startsWith('data:')}
-              />
               <button type="button" className="add-btn" onClick={() => photoFileRef.current?.click()}
                 style={{ whiteSpace: 'nowrap', background: 'rgba(139,92,246,0.15)', color: 'var(--primary-light)' }}>
-                📁 Выбрать файл
+                📁 Выбрать фото с компьютера
               </button>
               {formData.photoUrl && (
                 <button type="button" className="remove-btn" onClick={() => setFormData(prev => ({ ...prev, photoUrl: '' }))}>✕</button>
@@ -368,20 +359,11 @@ const TrainerProfileEdit = () => {
           </div>
 
           <div className="form-group">
-            <label>Видео (YouTube-ссылка или файл с компьютера)</label>
+            <label>Видео (файл с компьютера)</label>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-              <input
-                type="text"
-                name="videoUrl"
-                value={formData.videoUrl.startsWith('data:') ? '(загружено с компьютера)' : formData.videoUrl}
-                onChange={e => setFormData(prev => ({ ...prev, videoUrl: e.target.value }))}
-                placeholder="https://youtube.com/watch?v=... или выберите файл"
-                style={{ flex: 1, minWidth: '200px' }}
-                readOnly={formData.videoUrl.startsWith('data:')}
-              />
               <button type="button" className="add-btn" onClick={() => videoFileRef.current?.click()}
                 style={{ whiteSpace: 'nowrap', background: 'rgba(139,92,246,0.15)', color: 'var(--primary-light)' }}>
-                🎬 Выбрать файл
+                🎬 Выбрать видео с компьютера
               </button>
               {formData.videoUrl && (
                 <button type="button" className="remove-btn" onClick={() => setFormData(prev => ({ ...prev, videoUrl: '' }))}>✕</button>

@@ -861,11 +861,18 @@ async function verifyBookingQRCode(req, res) {
             });
         }
 
-        // Проверяем, что QR-код не был использован
-        if (booking.qrCodeScanned) {
+        // Проверяем, что QR-код не истек (3 часа после окончания занятия)
+        const scheduleEndDateTime = new Date(booking.schedule.date);
+        const [hours, minutes] = booking.schedule.endTime.split(':');
+        scheduleEndDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        const scheduleEndTime = scheduleEndDateTime;
+        const threeHoursAfterEnd = new Date(scheduleEndTime.getTime() +3 * 60 * 60 * 1000);
+        const now = new Date();
+
+        if (now > threeHoursAfterEnd) {
             return res.status(400).json({ 
-                error: 'QR-код уже был использован',
-                scannedAt: booking.qrCodeScannedAt
+                error: 'QR-код истек. Прошло более 3 часов после окончания занятия',
+                expiredAt: threeHoursAfterEnd
             });
         }
 
@@ -1267,16 +1274,22 @@ async function markAttendanceByQRCode(req, res) {
             return res.status(400).json({ error: 'Клиент уже отмечен как не пришедший' });
         }
 
-        // Проверяем, что QR-код не был использован
-        if (booking.qrCodeScanned) {
+        // Проверяем, что QR-код не истек (3 часа после окончания занятия)
+        const scheduleEndDateTime = new Date(booking.schedule.date);
+        const [endHours, endMinutes] = booking.schedule.endTime.split(':');
+        scheduleEndDateTime.setHours(parseInt(endHours), parseInt(endMinutes), 0, 0);
+        const scheduleEndTime = scheduleEndDateTime;
+        const threeHoursAfterEnd = new Date(scheduleEndTime.getTime() +3 * 60 * 60 * 1000);
+        const currentTime = new Date();
+
+        if (currentTime > threeHoursAfterEnd) {
             return res.status(400).json({ 
-                error: 'QR-код уже был использован',
-                scannedAt: booking.qrCodeScannedAt
+                error: 'QR-код истек. Прошло более 3 часов после окончания занятия',
+                expiredAt: threeHoursAfterEnd
             });
         }
 
         // Проверяем время (можно отмечать за 15 минут до начала)
-        const now = new Date();
         const scheduleDateTime = new Date(booking.schedule.date);
         scheduleDateTime.setHours(
             booking.schedule.startTime.getHours(),
@@ -1289,7 +1302,7 @@ async function markAttendanceByQRCode(req, res) {
         const earliestMarkTime = new Date(scheduleDateTime);
         earliestMarkTime.setMinutes(earliestMarkTime.getMinutes() - earlyMarkWindowMinutes);
 
-        if (now < earliestMarkTime) {
+        if (currentTime < earliestMarkTime) {
             return res.status(400).json({
                 error: `Нельзя отметить посещение до начала занятия. Можно отмечать за ${earlyMarkWindowMinutes} минут до старта.`
             });
@@ -1303,9 +1316,7 @@ async function markAttendanceByQRCode(req, res) {
             data: {
                 status: newStatus,
                 checkedIn: attended,
-                checkedInAt: attended ? new Date() : null,
-                qrCodeScanned: true,
-                qrCodeScannedAt: new Date()
+                checkedInAt: attended ? new Date() : null
             }
         });
 

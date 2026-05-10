@@ -421,6 +421,20 @@ class Controler{
             let {id} = req.params;
             let {isActive} = req.body;
 
+            // Проверяем пользователя
+            let existingUser = await prisma.user.findUnique({
+                where: {id}
+            });
+
+            if(!existingUser){
+                return res.status(404).json({error: 'Пользователь не найден'});
+            }
+
+            // Проверяем, что это не администратор
+            if(existingUser.role === 'admin'){
+                return res.status(403).json({error: 'Нельзя блокировать администратора'});
+            }
+
             let user = await prisma.user.update({
                 where: {id},
                 data: {isActive}
@@ -450,6 +464,11 @@ class Controler{
 
             if(!existingUser){
                 return res.status(404).json({error: 'Пользователь не найден'});
+            }
+
+            // Проверяем, что это не администратор
+            if(existingUser.role === 'admin'){
+                return res.status(403).json({error: 'Нельзя удалить администратора'});
             }
 
             let user = await prisma.user.delete({
