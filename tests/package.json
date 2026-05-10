@@ -1,0 +1,20 @@
+{
+  "name": "dance-studio-tests",
+  "version": "1.0.0",
+  "description": "Automated tests for Dance Studio application",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest --detectOpenHandles --forceExit",
+    "test:watch": "jest --watch --detectOpenHandles --forceExit",
+    "test:coverage": "jest --coverage --detectOpenHandles --forceExit",
+    "test:unit": "jest unit/ --detectOpenHandles --forceExit"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "@jest/globals": "^29.7.0",
+    "jest-environment-node": "^29.7.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1"
+  }
+}

@@ -4212,17 +4212,25 @@ class Controler{
             let contacts = [];
 
             if (role === 'client') {
-                // Клиент видит всех активных тренеров
-                const trainers = await prisma.trainer.findMany({
-                    where: { 
-                        user: { isActive: true }
-                    },
-                    include: {
-                        user: { select: { id: true, fullName: true, photoUrl: true, role: true, isActive: true } }
-                    }
-                });
+                // Клиент видит всех активных тренеров + админов
+                const [trainers, admins] = await Promise.all([
+                    // Все активные тренеры
+                    prisma.trainer.findMany({
+                        where: { 
+                            user: { isActive: true }
+                        },
+                        include: {
+                            user: { select: { id: true, fullName: true, photoUrl: true, role: true, isActive: true } }
+                        }
+                    }),
+                    // Все активные админы
+                    prisma.user.findMany({
+                        where: { role: 'admin', isActive: true },
+                        select: { id: true, fullName: true, photoUrl: true, role: true, isActive: true }
+                    })
+                ]);
 
-                contacts = trainers.map(trainer => ({
+                const trainerContacts = trainers.map(trainer => ({
                     id: trainer.user.id,
                     fullName: trainer.user.fullName,
                     photoUrl: trainer.user.photoUrl,
@@ -4231,20 +4239,39 @@ class Controler{
                     specialization: trainer.specialization || null,
                 }));
 
+                const adminContacts = admins.map(admin => ({
+                    id: admin.id,
+                    fullName: admin.fullName,
+                    photoUrl: admin.photoUrl,
+                    role: admin.role,
+                    isActive: admin.isActive,
+                    specialization: null,
+                }));
+
+                contacts = [...trainerContacts, ...adminContacts];
+
             } else if (role === 'trainer') {
-                // Тренер видит клиентов, которые записаны на его занятия
+                // Тренер видит клиентов, которые записаны на его занятия + всех админов
                 const trainerRecord = await prisma.trainer.findFirst({ where: { userId } });
                 if (!trainerRecord) return res.json({ contacts: [] });
 
-                const bookings = await prisma.booking.findMany({
-                    where: {
-                        status: { not: 'cancelled' },
-                        schedule: { trainerId: trainerRecord.id }
-                    },
-                    include: {
-                        client: { select: { id: true, fullName: true, photoUrl: true, role: true, isActive: true } }
-                    }
-                });
+                const [bookings, admins] = await Promise.all([
+                    // Клиенты тренера
+                    prisma.booking.findMany({
+                        where: {
+                            status: { not: 'cancelled' },
+                            schedule: { trainerId: trainerRecord.id }
+                        },
+                        include: {
+                            client: { select: { id: true, fullName: true, photoUrl: true, role: true, isActive: true } }
+                        }
+                    }),
+                    // Все админы
+                    prisma.user.findMany({
+                        where: { role: 'admin', isActive: true },
+                        select: { id: true, fullName: true, photoUrl: true, role: true, isActive: true }
+                    })
+                ]);
 
                 const clientMap = new Map();
                 for (const b of bookings) {
@@ -4252,7 +4279,17 @@ class Controler{
                         clientMap.set(b.client.id, b.client);
                     }
                 }
-                contacts = Array.from(clientMap.values());
+                const clientContacts = Array.from(clientMap.values());
+
+                const adminContacts = admins.map(admin => ({
+                    id: admin.id,
+                    fullName: admin.fullName,
+                    photoUrl: admin.photoUrl,
+                    role: admin.role,
+                    isActive: admin.isActive,
+                }));
+
+                contacts = [...clientContacts, ...adminContacts];
 
             } else if (role === 'admin') {
                 // Админ видит всех пользователей
