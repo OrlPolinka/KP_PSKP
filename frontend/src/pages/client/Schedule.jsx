@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -159,12 +159,15 @@ const Schedule = () => {
       if (user?.role === 'client') {
         try {
           const bookingsRes = await api.get('/bookings');
+          const bookings = bookingsRes.data.bookings || [];
+          
           const bookedIds = new Set(
-            (bookingsRes.data.bookings || [])
-              .filter(b => b.status !== 'cancelled')
+            bookings
+              .filter(b => b.status !== 'cancelled') // Берем все не-отмененные записи
               .map(b => b.schedule?.id)
               .filter(Boolean)
           );
+          
           setBookedScheduleIds(bookedIds);
           scheduleItems = scheduleItems.map(item => ({
             ...item,
@@ -204,6 +207,14 @@ const Schedule = () => {
       await api.post('/bookings', { scheduleId });
       alert('Вы успешно записаны на занятие!');
       setSelectedItem(null);
+      
+      // Сразу обновляем состояние для мгновенного отображения
+      setBookedScheduleIds(prev => new Set([...prev, scheduleId]));
+      setSchedule(prev => prev.map(item => 
+        item.id === scheduleId ? { ...item, isBooked: true } : item
+      ));
+      
+      // Затем загружаем свежие данные
       fetchData();
     } catch (error) {
       alert(error.response?.data?.error || 'Ошибка при записи');
@@ -220,31 +231,37 @@ const Schedule = () => {
     setCurrentPage(page);
   };
 
-  const filtered = schedule
-    .filter(item => {
-      const matchSearch = !search ||
-        item.danceStyle?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        item.trainer?.fullName?.toLowerCase().includes(search.toLowerCase()) ||
-        item.hall?.name?.toLowerCase().includes(search.toLowerCase());
-      const matchStyle = !selectedStyle || item.danceStyle?.id === parseInt(selectedStyle);
-      const currentBookings = item.bookingsCount ?? item.currentBookings;
-      const freeSlots = item.maxCapacity - currentBookings;
-      // Проверяем по дате И времени начала — занятие скрывается как только наступило его время
-      const pastNow = isPastDateTime(item.date, item.startTime);
-            if (filterStatus === 'available') return matchSearch && matchStyle && item.status === 'scheduled' && freeSlots > 0 && !pastNow;
-      if (filterStatus === 'today') return matchSearch && matchStyle && isToday(item.date) && !pastNow;
-      if (filterStatus === 'upcoming') return matchSearch && matchStyle && !pastNow;
-      return matchSearch && matchStyle;
-    })
-    .sort((a, b) => {
-      const aCurrent = a.bookingsCount ?? a.currentBookings;
-      const bCurrent = b.bookingsCount ?? b.currentBookings;
-      if (sortBy === 'date') return new Date(a.date) - new Date(b.date);
-      if (sortBy === 'date_desc') return new Date(b.date) - new Date(a.date);
-      if (sortBy === 'style') return (a.danceStyle?.name || '').localeCompare(b.danceStyle?.name || '');
-      if (sortBy === 'slots') return (b.maxCapacity - bCurrent) - (a.maxCapacity - aCurrent);
-      return 0;
-    });
+  const filtered = useMemo(() => {
+      return schedule
+        .map(item => ({
+          ...item,
+          isBooked: item.isBooked || bookedScheduleIds.has(item.id) // Обновляем isBooked в реальном времени
+        }))
+        .filter(item => {
+          const matchSearch = !search ||
+            item.danceStyle?.name?.toLowerCase().includes(search.toLowerCase()) ||
+            item.trainer?.fullName?.toLowerCase().includes(search.toLowerCase()) ||
+            item.hall?.name?.toLowerCase().includes(search.toLowerCase());
+          const matchStyle = !selectedStyle || item.danceStyle?.id === parseInt(selectedStyle);
+          const currentBookings = item.bookingsCount ?? item.currentBookings;
+          const freeSlots = item.maxCapacity - currentBookings;
+          // Проверяем по дате И времени начала — занятие скрывается как только наступило его время
+          const pastNow = isPastDateTime(item.date, item.startTime);
+                if (filterStatus === 'available') return matchSearch && matchStyle && item.status === 'scheduled' && freeSlots > 0 && !pastNow;
+          if (filterStatus === 'today') return matchSearch && matchStyle && isToday(item.date) && !pastNow;
+          if (filterStatus === 'upcoming') return matchSearch && matchStyle && !pastNow;
+          return matchSearch && matchStyle;
+        })
+        .sort((a, b) => {
+          const aCurrent = a.bookingsCount ?? a.currentBookings;
+          const bCurrent = b.bookingsCount ?? b.currentBookings;
+          if (sortBy === 'date') return new Date(a.date) - new Date(b.date);
+          if (sortBy === 'date_desc') return new Date(b.date) - new Date(a.date);
+          if (sortBy === 'style') return (a.danceStyle?.name || '').localeCompare(b.danceStyle?.name || '');
+          if (sortBy === 'slots') return (b.maxCapacity - bCurrent) - (a.maxCapacity - aCurrent);
+          return 0;
+        });
+    }, [schedule, bookedScheduleIds, search, selectedStyle, filterStatus, sortBy]);
 
   if (loading) return (
     <div className="loading">
