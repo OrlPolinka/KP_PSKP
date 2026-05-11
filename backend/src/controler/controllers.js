@@ -1282,8 +1282,12 @@ class Controler{
 
     async getSchedule(req, res){
         try{
+            console.log('getSchedule called!');
             let {role, id: userId} = req.user;
-            let {date, trainerId, status, fromDate, toDate, page = 1, limit = 10} = req.query;
+            let {date, trainerId, status, fromDate, toDate, page = 1, limit = role === 'admin' ? 100 : 10} = req.query;
+            
+            // Отладка
+            console.log('getSchedule debug - role:', role, 'limit:', limit);
 
             // Пагинация
             const skip = (parseInt(page) - 1) * parseInt(limit);

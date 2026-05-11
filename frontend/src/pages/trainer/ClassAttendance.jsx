@@ -245,15 +245,7 @@ const ClassAttendance = () => {
                 🏛️ {selectedSchedule.hall?.name}
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                className="btn btn-primary"
-                onClick={() => setShowQRScanner(true)}
-              >
-                📱 Сканировать QR-код
-              </button>
-            </div>
-          </div>
+                      </div>
 
           {message && (
             <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-error'}`} style={{ marginBottom: '16px' }}>
