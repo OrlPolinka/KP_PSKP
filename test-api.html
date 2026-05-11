@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>Тест API</h1>
+    <button onclick="testLogin()">Войти и получить пользователей</button>
+    <div id="result"></div>
+
+    <script>
+        async function testLogin() {
+            try {
+                // 1. Логин
+                const loginResponse = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'admin@dancestudio.ru', password: '123456' })
+                });
+                
+                const loginData = await loginResponse.json();
+                console.log('Login response:', loginData);
+                
+                if (loginData.token) {
+                    // 2. Получить пользователей с токеном
+                    const usersResponse = await fetch('http://localhost:5000/api/users', {
+                        headers: { 'Authorization': 'Bearer ' + loginData.token }
+                    });
+                    
+                    const usersData = await usersResponse.json();
+                    console.log('Users response:', usersData);
+                    
+                    document.getElementById('result').innerHTML = `
+                        <h3>Результат:</h3>
+                        <p>Статус: ${usersResponse.status}</p>
+                        <p>Пользователей найдено: ${usersData.users ? usersData.users.length : 0}</p>
+                        <pre>${JSON.stringify(usersData, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('result').innerHTML = `<p style="color: red">Ошибка: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

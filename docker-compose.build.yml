@@ -1,0 +1,63 @@
+version: '3.3'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dance_studio_db_build
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: dance_studio
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_build:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: dance_studio_backend_build
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/dance_studio
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=5000
+      - NODE_ENV=production
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo '🔄 Building and seeding database...' &&
+        ./wait-for-postgres.sh postgres &&
+        npx prisma db push &&
+        npx prisma db seed &&
+        echo '✅ Database built and seeded successfully' &&
+        npm start
+      "
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - REACT_APP_API_URL=/api
+    container_name: dance_studio_frontend_build
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: ./docker
+      dockerfile: Dockerfile.nginx
+    container_name: dance_studio_nginx_build
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data_build:
