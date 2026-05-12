@@ -84,8 +84,10 @@ export const isPastDateTime = (dateString, startTime) => {
       timeStr = t.slice(0, 5); // "HH:mm"
     }
   }
-  const classDateTime = new Date(`${dateStr}T${timeStr}:00`);
-  return classDateTime < new Date();
+  // Создаем дату в UTC для корректного сравнения
+  const classDateTime = new Date(`${dateStr}T${timeStr}:00Z`);
+  const now = new Date();
+  return classDateTime < now;
 };
 
 export const isToday = (dateString) => {

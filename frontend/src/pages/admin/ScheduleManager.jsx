@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { scheduleService } from '../../services/scheduleService';
 import { userService } from '../../services/userService';
-import { formatDate, formatTime, isPastDate, isToday } from '../../utils/dateHelpers';
+import { formatDate, formatTime, isPastDate, isPastDateTime, isToday } from '../../utils/dateHelpers';
 import api from '../../services/api';
 
 const statusConfig = {
@@ -178,8 +178,8 @@ const ScheduleManager = () => {
     </div>
   );
 
-  const upcomingCount = schedule.filter(i => !isPastDate(i.date) || isToday(i.date)).length;
-  const pastCount = schedule.filter(i => isPastDate(i.date) && !isToday(i.date)).length;
+  const upcomingCount = schedule.filter(i => !isPastDateTime(i.date, i.endTime) || isToday(i.date)).length;
+  const pastCount = schedule.filter(i => isPastDateTime(i.date, i.endTime) && !isToday(i.date)).length;
 
   return (
     <div className="container">
@@ -246,9 +246,9 @@ const ScheduleManager = () => {
                   </td>
                 </tr>
               ) : filtered.map(item => {
-                const past = isPastDate(item.date);
+                const past = isPastDateTime(item.date, item.endTime);
                 const today = isToday(item.date);
-                const effectiveStatus = (item.status === 'scheduled' && isPastDate(item.date) && !isToday(item.date))
+                const effectiveStatus = (item.status === 'scheduled' && isPastDateTime(item.date, item.endTime))
                   ? 'completed'
                   : item.status;
                 const status = statusConfig[effectiveStatus] || statusConfig.scheduled;
