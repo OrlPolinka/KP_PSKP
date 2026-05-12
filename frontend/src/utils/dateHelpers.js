@@ -2,6 +2,11 @@ export const formatDate = (dateString) => {
 
   if (!dateString) return '—';
 
+  // Если дата уже в формате DD.MM.YYYY, возвращаем как есть
+  if (typeof dateString === 'string' && /^\d{2}\.\d{2}\.\d{4}$/.test(dateString)) {
+    return dateString;
+  }
+
   const date = new Date(dateString);
 
   if (isNaN(date.getTime())) {
