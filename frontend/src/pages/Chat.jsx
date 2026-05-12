@@ -195,9 +195,12 @@ const Chat = () => {
               lastMessage: null
             }));
           } else if (user.role === 'trainer') {
-            // Тренер видит клиентов
-            const clientsRes = await api.get('/users?role=client');
-            contactsData = (clientsRes.data.users || []).map(u => ({
+            // Тренер видит клиентов и администраторов
+            const [clientsRes, adminsRes] = await Promise.all([
+              api.get('/users?role=client'),
+              api.get('/users?role=admin')
+            ]);
+            const clients = (clientsRes.data.users || []).map(u => ({
               id: u.id,
               fullName: u.fullName,
               photoUrl: u.photoUrl,
@@ -206,6 +209,16 @@ const Chat = () => {
               unreadCount: 0,
               lastMessage: null
             }));
+            const admins = (adminsRes.data.users || []).map(u => ({
+              id: u.id,
+              fullName: u.fullName,
+              photoUrl: u.photoUrl,
+              role: u.role,
+              isActive: u.isActive,
+              unreadCount: 0,
+              lastMessage: null
+            }));
+            contactsData = [...clients, ...admins];
           } else if (user.role === 'client') {
             // Клиент видит тренеров
             const trainersRes = await api.get('/trainers');

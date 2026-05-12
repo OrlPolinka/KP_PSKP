@@ -165,21 +165,7 @@ const AllQRCodes = () => {
                             <div className="qr-info">
                                 <div className="qr-info-item">
                                     <Calendar size={16} />
-                                    {(() => {
-                                        try {
-                                            const date = new Date(qrCode.schedule.date);
-                                            if (isNaN(date.getTime())) {
-                                                return 'Некорректная дата';
-                                            }
-                                            return date.toLocaleDateString('ru-RU', {
-                                                day: '2-digit',
-                                                month: '2-digit',
-                                                year: 'numeric'
-                                            }).replace(/\./g, '.');
-                                        } catch (e) {
-                                            return 'Ошибка даты';
-                                        }
-                                    })()}
+                                    {qrCode.schedule.date}
                                 </div>
                                 <div className="qr-info-item">
                                     <Clock size={16} />

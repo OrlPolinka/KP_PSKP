@@ -113,7 +113,7 @@ const MyBookings = () => {
       setError(null);
       const response = await bookingService.getBookings({ 
         page: currentPage, 
-        limit: 5,
+        limit: 9,
         bookingType: activeTab
       });
       setBookings(response.bookings || []);

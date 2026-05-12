@@ -595,22 +595,23 @@ async function generateBookingQRCode(req, res) {
         const formatDateForClient = (dateValue) => {
             if (!dateValue) return '';
             
-            let dateObj;
-            if (typeof dateValue === 'string') {
-                dateObj = new Date(dateValue);
-            } else {
-                dateObj = dateValue;
+            let year, month, day;
+            
+            // Если пришла строка в формате YYYY-MM-DD
+            if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateValue)) {
+                [year, month, day] = dateValue.split('T')[0].split('-');
+                return `${day}.${month}.${year}`;
             }
             
-            if (isNaN(dateObj.getTime())) {
-                return '';
-            }
+            // Если пришёл объект Date или ISO строка
+            let dateObj = new Date(dateValue);
+            if (isNaN(dateObj.getTime())) return '';
             
-            return dateObj.toLocaleDateString('ru-RU', {
-                day: '2-digit',
-                month: '2-digit', 
-                year: 'numeric'
-            });
+            day = dateObj.getDate().toString().padStart(2, '0');
+            month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+            year = dateObj.getFullYear();
+            
+            return `${day}.${month}.${year}`;
         };
 
         res.json({
@@ -717,25 +718,37 @@ async function getTodayQRCodes(req, res) {
             const qrImage = await QRCode.toDataURL(qrData);
 
             // Форматируем дату
-            const formatDate = (dateValue) => {
+            const formatDateForClient = (dateValue) => {
+                console.log('formatDateForClient input:', dateValue, 'type:', typeof dateValue);
+                
                 if (!dateValue) return '';
                 
-                let dateObj;
-                if (typeof dateValue === 'string') {
-                    dateObj = new Date(dateValue);
-                } else {
-                    dateObj = dateValue;
+                let year, month, day;
+                
+                // Если пришла строка в формате YYYY-MM-DD
+                if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateValue)) {
+                    [year, month, day] = dateValue.split('T')[0].split('-');
+                    const result = `${day}.${month}.${year}`;
+                    console.log('formatDateForClient result (string):', result);
+                    return result;
                 }
                 
+                // Если пришёл объект Date или ISO строка
+                let dateObj = new Date(dateValue);
+                console.log('dateObj:', dateObj, 'isNaN:', isNaN(dateObj.getTime()));
+                
                 if (isNaN(dateObj.getTime())) {
+                    console.log('Invalid date, returning empty string');
                     return '';
                 }
                 
-                return dateObj.toLocaleDateString('ru-RU', {
-                    day: '2-digit',
-                    month: '2-digit', 
-                    year: 'numeric'
-                });
+                day = dateObj.getDate().toString().padStart(2, '0');
+                month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+                year = dateObj.getFullYear();
+                
+                const result = `${day}.${month}.${year}`;
+                console.log('formatDateForClient result (Date):', result);
+                return result;
             };
 
             // Форматируем время
@@ -787,7 +800,7 @@ async function getTodayQRCodes(req, res) {
                 qrCode: qrCode,
                 qrImage: qrImage,
                 schedule: {
-                    date: formatDate(booking.schedule.date),
+                    date: formatDateForClient(booking.schedule.date),
                     startTime: formatTimeSimple(booking.schedule.startTime),
                     endTime: formatTimeSimple(booking.schedule.endTime),
                     danceStyle: booking.schedule.danceStyle.name,
@@ -1082,25 +1095,37 @@ async function getAllQRCodes(req, res) {
                            scheduleDate >= today;
 
             // Форматируем дату
-            const formatDate = (dateValue) => {
+            const formatDateForClient = (dateValue) => {
+                console.log('formatDateForClient input:', dateValue, 'type:', typeof dateValue);
+                
                 if (!dateValue) return '';
                 
-                let dateObj;
-                if (typeof dateValue === 'string') {
-                    dateObj = new Date(dateValue);
-                } else {
-                    dateObj = dateValue;
+                let year, month, day;
+                
+                // Если пришла строка в формате YYYY-MM-DD
+                if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateValue)) {
+                    [year, month, day] = dateValue.split('T')[0].split('-');
+                    const result = `${day}.${month}.${year}`;
+                    console.log('formatDateForClient result (string):', result);
+                    return result;
                 }
                 
+                // Если пришёл объект Date или ISO строка
+                let dateObj = new Date(dateValue);
+                console.log('dateObj:', dateObj, 'isNaN:', isNaN(dateObj.getTime()));
+                
                 if (isNaN(dateObj.getTime())) {
+                    console.log('Invalid date, returning empty string');
                     return '';
                 }
                 
-                return dateObj.toLocaleDateString('ru-RU', {
-                    day: '2-digit',
-                    month: '2-digit', 
-                    year: 'numeric'
-                });
+                day = dateObj.getDate().toString().padStart(2, '0');
+                month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+                year = dateObj.getFullYear();
+                
+                const result = `${day}.${month}.${year}`;
+                console.log('formatDateForClient result (Date):', result);
+                return result;
             };
 
             // Форматируем время
@@ -1180,7 +1205,7 @@ async function getAllQRCodes(req, res) {
                 qrCodeScanned: booking.qrCodeScanned,
                 canScan,
                 schedule: {
-                    date: formatDate(booking.schedule.date),
+                    date: formatDateForClient(booking.schedule.date),
                     startTime: formatTimeSimple(booking.schedule.startTime),
                     endTime: formatTimeSimple(booking.schedule.endTime),
                     danceStyle: booking.schedule.danceStyle.name,

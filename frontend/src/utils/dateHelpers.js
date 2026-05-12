@@ -1,6 +1,18 @@
 export const formatDate = (dateString) => {
   if (!dateString) return '—';
-  const date = new Date(dateString);
+  
+  let date;
+  if (typeof dateString === 'string') {
+    date = new Date(dateString);
+  } else if (typeof dateString === 'object' && dateString.toISOString) {
+    date = new Date(dateString.toISOString());
+  } else {
+    date = new Date(dateString);
+  }
+  
+  if (isNaN(date.getTime())) {
+    return 'Некорректная дата';
+  }
   return date.toLocaleDateString('ru-RU', {
     day: '2-digit',
     month: '2-digit',
