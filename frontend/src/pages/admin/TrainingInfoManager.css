@@ -236,3 +236,33 @@
   cursor: pointer;
   font-weight: 500;
 }
+
+/* Стили для кнопок загрузки файлов как в профиле тренера */
+.add-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}
+
+.add-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.remove-btn {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.3s ease;
+}
+
+.remove-btn:hover {
+  background: rgba(239, 68, 68, 0.28);
+}

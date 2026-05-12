@@ -276,7 +276,7 @@ const TrainerProfile = () => {
 
             ) : (
 
-              <video controls src={trainer.videoUrl} />
+              <video controls src={trainer.videoUrl} style={{ width: '100%', borderRadius: '8px' }} />
 
             )}
 

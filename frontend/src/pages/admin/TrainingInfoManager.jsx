@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 import api from '../../services/api';
 
@@ -50,6 +50,22 @@ const TrainingInfoManager = () => {
 
     isActive: true
 
+  });
+
+  const videoFileRef = useRef(null);
+
+  const imageFileRef = useRef(null);
+
+  // Конвертация файлов в base64 как у тренера
+  const readFileAsBase64 = (file) => new Promise((resolve, reject) => {
+    if (file.size > 50 * 1024 * 1024) { 
+      reject(new Error('Файл слишком большой (макс. 50 МБ)')); 
+      return; 
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => resolve(ev.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
   });
 
 
@@ -162,6 +178,32 @@ const TrainingInfoManager = () => {
 
     }));
 
+  };
+
+  const handleVideoFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      try {
+        const base64 = await readFileAsBase64(file);
+        setFormData(prev => ({ ...prev, videoUrl: base64 }));
+      } catch (err) {
+        console.error('Ошибка при загрузке видео:', err);
+        alert('Ошибка при загрузке видео: ' + (err.message || 'Неизвестная ошибка'));
+      }
+    }
+  };
+
+  const handleImageFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      try {
+        const base64 = await readFileAsBase64(file);
+        setFormData(prev => ({ ...prev, imageUrl: base64 }));
+      } catch (err) {
+        console.error('Ошибка при загрузке изображения:', err);
+        alert('Ошибка при загрузке изображения: ' + (err.message || 'Неизвестная ошибка'));
+      }
+    }
   };
 
 
@@ -420,17 +462,73 @@ const TrainingInfoManager = () => {
 
                 <div className="form-group">
 
-                  <label>URL видео</label>
+                  <label>Видео (файл с компьютера)</label>
 
-                  <input name="videoUrl" value={formData.videoUrl} onChange={handleChange} />
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+
+                    <button type="button" className="add-btn" onClick={() => videoFileRef.current?.click()}
+
+                      style={{ whiteSpace: 'nowrap', background: 'rgba(139,92,246,0.15)', color: 'var(--primary-light)' }}>
+
+                      🎬 Выбрать видео с компьютера
+
+                    </button>
+
+                    {formData.videoUrl && (
+
+                      <button type="button" className="remove-btn" onClick={() => setFormData(prev => ({ ...prev, videoUrl: '' }))}>✕</button>
+
+                    )}
+
+                  </div>
+
+                  <input ref={videoFileRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={handleVideoFileChange} />
+
+                  {formData.videoUrl && formData.videoUrl.startsWith('data:video') && (
+
+                    <div style={{ marginTop: '10px' }}>
+
+                      <video src={formData.videoUrl} controls style={{ width: '100%', maxHeight: '150px', borderRadius: '8px' }} />
+
+                    </div>
+
+                  )}
 
                 </div>
 
                 <div className="form-group">
 
-                  <label>URL изображения</label>
+                  <label>Изображение (файл с компьютера)</label>
 
-                  <input name="imageUrl" value={formData.imageUrl} onChange={handleChange} />
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+
+                    <button type="button" className="add-btn" onClick={() => imageFileRef.current?.click()}
+
+                      style={{ whiteSpace: 'nowrap', background: 'rgba(139,92,246,0.15)', color: 'var(--primary-light)' }}>
+
+                      📁 Выбрать изображение с компьютера
+
+                    </button>
+
+                    {formData.imageUrl && (
+
+                      <button type="button" className="remove-btn" onClick={() => setFormData(prev => ({ ...prev, imageUrl: '' }))}>✕</button>
+
+                    )}
+
+                  </div>
+
+                  <input ref={imageFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageFileChange} />
+
+                  {formData.imageUrl && formData.imageUrl.startsWith('data:image') && (
+
+                    <div style={{ marginTop: '10px' }}>
+
+                      <img src={formData.imageUrl} alt="Preview" style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '10px', border: '2px solid rgba(139,92,246,0.3)' }} />
+
+                    </div>
+
+                  )}
 
                 </div>
 

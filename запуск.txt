@@ -89,3 +89,15 @@ docker-compose down
 Тестовые карты:
 4242424242424242 - успешная оплата
 4000000000000002 - ошибка недостаточно средств
+
+
+
+
+
+
+$ cd backend
+$ docker exec dance_studio_backend npx prisma db push --force-reset
+$ docker exec dance_studio_backend npm run seed
+cd ..
+
+

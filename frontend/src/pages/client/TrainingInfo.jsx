@@ -146,7 +146,7 @@ const TrainingInfo = () => {
                             allowFullScreen
                           />
                         ) : (
-                          <video controls src={item.videoUrl} />
+                          <video controls src={item.videoUrl} style={{ width: '100%', borderRadius: '8px' }} />
                         )}
                       </div>
                     )}
