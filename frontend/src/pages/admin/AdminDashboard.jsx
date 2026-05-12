@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 const AdminDashboard = () => {
   const menuItems = [
     { title: 'Пользователи', path: '/admin/users', icon: '👥', description: 'Управление пользователями и их ролями' },
-    { title: 'Тренеры', path: '/admin/trainers', icon: '🏋️', description: 'Добавление и редактирование тренеров' },
+    { title: 'Тренеры', path: '/admin/users?role=trainer', icon: '🏋️', description: 'Просмотр и управление тренерами' },
     { title: 'Расписание', path: '/admin/schedule', icon: '📅', description: 'Создание и управление расписанием' },
     { title: 'Типы абонементов', path: '/admin/membership-types', icon: '🎫', description: 'Управление тарифами' },
     { title: 'Аналитика', path: '/admin/analytics', icon: '📊', description: 'Статистика и отчеты' },

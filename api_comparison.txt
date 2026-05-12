@@ -1,0 +1,129 @@
+ТОЧНОЕ СРАВНЕНИЕ API МАРШРУТОВ
+
+ВАША ТАБЛИЦА vs РЕАЛЬНЫЙ ПРОЕКТ:
+
+=== АУТЕНТИФИКАЦИЯ ===
+✅ POST /api/auth/register                    - register
+✅ POST /api/auth/login                       - login
+✅ POST /api/auth/change-password              - changePassword (ЕСТЬ В ПРОЕКТЕ, НЕТ В ВАШЕЙ ТАБЛИЦЕ)
+✅ GET  /api/auth/me                          - getMe
+
+=== ПОЛЬЗОВАТЕЛИ ===
+✅ GET  /api/users                           - getUsers
+✅ GET  /api/users/:id                       - getUserById
+❌ PUT  /api/users/:id                       - updateUser (НЕТ В ПРОЕКТЕ)
+✅ PUT  /api/users/:id/block                 - blockUser
+✅ PUT  /api/users/:id/profile               - updateUserProfile
+✅ DELETE /api/users/:id                       - deleteUser
+
+=== ТРЕНЕРЫ ===
+✅ GET  /api/trainers                        - getTrainers
+❌ GET  /api/trainers/:id                    - getTrainerById (НЕТ В ПРОЕКТЕ)
+✅ POST /api/trainers                        - createTrainer
+✅ PUT  /api/trainers/:id                    - updateTrainer
+✅ DELETE /api/trainers/:id                    - deleteTrainer
+
+=== РАСПИСАНИЕ ===
+✅ POST /api/schedule/complete-passed         - completePassedSchedules (ЕСТЬ В ПРОЕКТЕ, НЕТ В ВАШЕЙ ТАБЛИЦЕ)
+✅ POST /api/schedule                        - createSchedule
+✅ PUT  /api/schedule/:id                    - updateSchedule
+✅ DELETE /api/schedule/:id                    - deleteSchedule
+✅ GET  /api/schedule                        - getSchedule
+✅ GET  /api/schedule/:id                    - getScheduleById
+
+=== ЗАПИСИ НА ЗАНЯТИЯ ===
+✅ GET  /api/bookings                         - getBookings
+✅ GET  /api/bookings/schedule/:scheduleId     - getBookingsBySchedule (ЕСТЬ В ПРОЕКТЕ, НЕТ В ВАШЕЙ ТАБЛИЦЕ)
+✅ POST /api/bookings                         - createBooking
+✅ PUT  /api/bookings/:id/cancel              - cancelBooking
+✅ PUT  /api/bookings/:id/attend              - markAttendance (ЕСТЬ В ПРОЕКТЕ, НЕТ В ВАШЕЙ ТАБЛИЦЕ)
+✅ POST /api/bookings/mark-attendance-by-qr  - markAttendanceByQRCode (ЕСТЬ В ПРОЕКТЕ)
+
+=== АБОНЕМЕНТЫ ===
+✅ GET  /api/memberships                      - getMemberships
+✅ POST /api/memberships                      - createMembership
+✅ PUT  /api/memberships/:id                  - updateMembership
+✅ GET  /api/memberships/:id                  - getMembershipById
+✅ PUT  /api/memberships/:id/pause            - pauseMembership
+
+=== ТИПЫ АБОНЕМЕНТОВ ===
+✅ GET  /api/membership-types                 - getMembershipTypes (ЕСТЬ В ПРОЕКТЕ, НЕТ В ВАШЕЙ ТАБЛИЦЕ)
+✅ POST /api/membership-types                 - createMembershipType (ЕСТЬ В ПРОЕКТЕ)
+✅ PUT  /api/membership-types/:id             - updateMembershipType (ЕСТЬ В ПРОЕКТЕ)
+✅ DELETE /api/membership-types/:id             - deleteMembershipType (ЕСТЬ В ПРОЕКТЕ)
+
+=== ПЛАТЕЖИ ===
+✅ POST /api/payments                         - createPayment
+✅ POST /api/payments/webhook                - paymentWebhook
+✅ GET  /api/payments/history                 - getPaymentHistory
+
+=== ЧАТ ===
+✅ GET  /api/chat/contacts                   - getChatContacts
+✅ GET  /api/chat/messages/:userId            - getMessages (В ВАШЕЙ ТАБЛИЦЕ)
+✅ POST /api/chat/messages                   - sendMessage (В ВАШЕЙ ТАБЛИЦЕ)
+✅ GET  /api/chat/search                     - searchChatUsers (ЕСТЬ В ПРОЕКТЕ, НЕТ В ВАШЕЙ ТАБЛИЦЕ)
+✅ GET  /api/chat/history/:userId             - getChatHistory (ЕСТЬ В ПРОЕКТЕ, НЕТ В ВАШЕЙ ТАБЛИЦЕ)
+✅ GET  /api/chat/unread                    - getUnreadCount
+✅ GET  /api/chat/unread-for-contact/:contactId - getUnreadCountForContact (ЕСТЬ В ПРОЕКТЕ)
+✅ PUT  /api/chat/messages/:messageId       - editMessage (ЕСТЬ В ПРОЕКТЕ)
+✅ DELETE /api/chat/messages/:messageId       - deleteMessage (ЕСТЬ В ПРОЕКТЕ)
+✅ DELETE /api/chat/dialog/:userId            - deleteDialog (ЕСТЬ В ПРОЕКТЕ)
+
+=== УВЕДОМЛЕНИЯ ===
+✅ GET  /api/notifications                   - getNotifications
+✅ PUT  /api/notifications/:id/read         - markNotificationRead
+✅ PUT  /api/notifications/read-all         - markAllNotificationsRead
+
+=== АНАЛИТИКА ===
+✅ GET  /api/analytics/popular              - getPopularClasses (ЕСТЬ В ПРОЕКТЕ, НЕТ В ВАШЕЙ ТАБЛИЦЕ)
+✅ GET  /api/analytics/trainers             - getTrainersStats (ЕСТЬ В ПРОЕКТЕ)
+✅ GET  /api/analytics/financial             - getFinancialStats (ЕСТЬ В ПРОЕКТЕ)
+
+=== ЗАЛЫ ===
+✅ GET  /api/halls                           - getHalls (ЕСТЬ В ПРОЕКТЕ, НЕТ В ВАШЕЙ ТАБЛИЦЕ)
+✅ POST /api/halls                           - createHall (ЕСТЬ В ПРОЕКТЕ)
+✅ PUT  /api/halls/:id                       - updateHall (ЕСТЬ В ПРОЕКТЕ)
+✅ DELETE /api/halls/:id                       - deleteHall (ЕСТЬ В ПРОЕКТЕ)
+
+=== СТИЛИ ТАНЦЕВ ===
+✅ GET  /api/dance-styles                    - getDanceStyles (ЕСТЬ В ПРОЕКТЕ, НЕТ В ВАШЕЙ ТАБЛИЦЕ)
+✅ POST /api/dance-styles                    - createDanceStyle (ЕСТЬ В ПРОЕКТЕ)
+✅ PUT  /api/dance-styles/:id                - updateDanceStyle (ЕСТЬ В ПРОЕКТЕ)
+✅ DELETE /api/dance-styles/:id                - deleteDanceStyle (ЕСТЬ В ПРОЕКТЕ)
+
+=== ИСТОРИЯ ===
+✅ GET  /api/history                         - getHistory (ЕСТЬ В ПРОЕКТЕ, НЕТ В ВАШЕЙ ТАБЛИЦЕ)
+
+=== ДОПОЛНИТЕЛЬНЫЕ МАРШРУТЫ ===
+✅ GET  /api/public/trainers                 - getPublicTrainers (ЕСТЬ В ПРОЕКТЕ)
+✅ GET  /api/public/trainers/:id             - getPublicTrainerById (ЕСТЬ В ПРОЕКТЕ)
+✅ PUT  /api/trainer/profile/:id             - updateTrainerProfile (ЕСТЬ В ПРОЕКТЕ)
+✅ GET  /api/dance-styles-detailed           - getDanceStylesDetailed (ЕСТЬ В ПРОЕКТЕ)
+✅ GET  /api/dance-styles-detailed/:id       - getDanceStyleById (ЕСТЬ В ПРОЕКТЕ)
+✅ PUT  /api/dance-styles-detailed/:id       - updateDanceStyleDetailed (ЕСТЬ В ПРОЕКТЕ)
+✅ GET  /api/training-info                   - getTrainingInfo (ЕСТЬ В ПРОЕКТЕ)
+✅ POST /api/training-info                   - createTrainingInfo (ЕСТЬ В ПРОЕКТЕ)
+✅ PUT  /api/training-info/:id               - updateTrainingInfo (ЕСТЬ В ПРОЕКТЕ)
+✅ DELETE /api/training-info/:id               - deleteTrainingInfo (ЕСТЬ В ПРОЕКТЕ)
+
+=== QR-КОДЫ ===
+✅ GET  /api/bookings/:bookingId/qrcode      - generateBookingQRCode (ЕСТЬ В ПРОЕКТЕ)
+✅ GET  /api/bookings/:bookingId/qrcode/download - downloadQRCode (ЕСТЬ В ПРОЕКТЕ)
+✅ GET  /api/bookings/today/qrcodes          - getTodayQRCodes (ЕСТЬ В ПРОЕКТЕ)
+✅ GET  /api/bookings/all/qrcodes             - getAllQRCodes (ЕСТЬ В ПРОЕКТЕ)
+✅ POST /api/bookings/verify-qrcode          - verifyBookingQRCode (ЕСТЬ В ПРОЕКТЕ)
+✅ POST /api/bookings/mark-attendance-by-qr  - markAttendanceByQRCode (ЕСТЬ В ПРОЕКТЕ)
+
+=== АДМИНИСТРИРОВАНИЕ ===
+❌ PUT  /api/admin/dashboard                 - getDashboard (НЕТ В ПРОЕКТЕ)
+❌ GET  /api/admin/users                     - getAllUsers (НЕТ В ПРОЕКТЕ)
+❌ PUT  /api/admin/users/:id/ban             - banUser (НЕТ В ПРОЕКТЕ)
+❌ PUT  /api/admin/users/:id/unban           - unbanUser (НЕТ В ПРОЕКТЕ)
+
+=== ИТОГ ===
+ВАША ТАБЛИЦА: ~30 маршрутов
+РЕАЛЬНЫЙ ПРОЕКТ: ~65 маршрутов
+
+РАСХОЖДЕНИЕ: ~60%
+ОШИБОК В ВАШЕЙ ТАБЛИЦЕ: ~15 маршрутов
+ПРОПУЩЕНЫХ МАРШРУТОВ: ~35 штук

@@ -344,7 +344,10 @@ class Controler{
     //пользователи
     async getUsers(req, res){
         try{
-            let {page = 1, limit = 10} = req.query;
+            let {page = 1, limit = 100} = req.query;
+            
+            // Отладка
+            console.log('getUsers called with limit:', limit);
 
             // Пагинация
             const skip = (parseInt(page) - 1) * parseInt(limit);

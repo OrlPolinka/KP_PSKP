@@ -1,0 +1,62 @@
+ПОЛНАЯ ТАБЛИЦА ВАШИХ API МАРШРУТОВ
+
+Аутентификация			
+POST	/api/auth/register	auth	registration
+POST	/api/auth/login	auth	login
+GET	/api/auth/me	auth	getMe
+
+Пользователи			
+GET	/api/users	users	getAllUsers
+GET	/api/users/:id	users	getUserById
+PUT	/api/users/:id	users	updateUser
+DELETE	/api/users/:id	users	deleteUser
+PUT	/api/users/:id/block	users	blockUser
+PUT	/api/users/:id/profile	users	updateUserProfile
+
+Тренеры			
+GET	/api/trainers	trainers	getAllTrainers
+GET	/api/trainers/:id	trainers	getTrainerById
+POST	/api/trainers	trainers	createTrainer
+PUT	/api/trainers/:id	trainers	updateTrainer
+DELETE	/api/trainers/:id	trainers	deleteTrainer
+
+Расписание			
+GET	/api/schedule	schedule	getSchedule
+GET	/api/schedule/:id	schedule	getScheduleById
+POST	/api/schedule	schedule	createSchedule
+PUT	/api/schedule/:id	schedule	updateSchedule
+DELETE	/api/schedule/:id	schedule	deleteSchedule
+
+Записи			
+GET	/api/bookings	bookings	getBookings
+POST	/api/bookings	bookings	createBooking
+PUT	/api/bookings/:id/cancel	bookings	cancelBooking
+POST	/api/bookings/mark-attendance-by-qr	bookings	markAttendanceByQRCode
+
+Абонементы			
+GET	/api/memberships	memberships	getMemberships
+POST	/api/memberships	Memberships	createMembership
+PUT	/api/memberships/:id	memberships	updateMembership
+GET	/api/memberships/:id	memberships	getMembershipById
+PUT	/api/memberships/:id/pause	memberships	pauseMembership
+
+Платежи			
+POST	/api/payments	payments	createPayment
+POST	/api/payments/webhook	payments	paymentWebhook
+GET	/api/payments/history	payments	getPaymentHistory
+
+Чат			
+GET	/api/chat/contacts	chat	getChatContacts
+GET	/api/chat/messages/:userId	chat	getMessages
+POST	/api/chat/messages	chat	sendMessage
+
+Уведомления			
+GET	/api/notifications	notifications	getNotifications
+PUT	/api/notifications/:id/read	notifications	markNotificationRead
+PUT	/api/notifications/read-all	notifications	markAllNotificationsRead
+
+Администрирование			
+PUT	/api/admin/dashboard	admin	getDashboard
+GET	/api/admin/users	admin	getAllUsers
+PUT	/api/admin/users/:id/ban	admin	banUser
+PUT	/api/admin/users/:id/unban	admin	unbanUser
