@@ -4,6 +4,40 @@ import api from '../../services/api';
 
 import './TrainerProfileEdit.css';
 
+// Error Boundary для предотвращения черного экрана
+class TrainerProfileErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('TrainerProfileEdit Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="trainer-profile-edit-page">
+          <div className="error-message">
+            <h2>⚠️ Ошибка в профиле тренера</h2>
+            <p>Произошла ошибка. Попробуйте перезагрузить страницу.</p>
+            <button onClick={() => window.location.reload()} className="retry-btn">
+              🔄 Обновить страницу
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 
 
 const TrainerProfileEdit = () => {
@@ -44,7 +78,7 @@ const TrainerProfileEdit = () => {
 
 
 
-  const [gallery, setGallery] = useState([]);
+  const [gallery] = useState([]);
 
   const [achievements, setAchievements] = useState([]);
 
@@ -54,11 +88,11 @@ const TrainerProfileEdit = () => {
 
 
 
+
   const photoFileRef = React.useRef();
 
   const videoFileRef = React.useRef();
 
-  const galleryFileRefs = React.useRef({});
 
 
 
@@ -102,6 +136,7 @@ const TrainerProfileEdit = () => {
 
 
 
+
   // Конвертация видео в base64
 
   const readFileAsBase64 = (file) => new Promise((resolve, reject) => {
@@ -117,6 +152,7 @@ const TrainerProfileEdit = () => {
     reader.readAsDataURL(file);
 
   });
+
 
 
 
@@ -164,50 +200,6 @@ const TrainerProfileEdit = () => {
 
 
 
-  const handleGalleryFileChange = async (e, index) => {
-
-    const file = e.target.files[0];
-
-    if (!file) return;
-
-    try {
-
-      let base64;
-
-      if (file.type.startsWith('image/')) {
-
-        base64 = await compressImage(file);
-
-      } else if (file.type.startsWith('video/')) {
-
-        base64 = await readFileAsBase64(file);
-
-      } else {
-
-        setMessage({ type: 'error', text: 'Поддерживаются только фото и видео' });
-
-        return;
-
-      }
-
-      const updated = [...gallery];
-
-      updated[index].url = base64;
-
-      setGallery(updated);
-
-      setMessage({ type: 'success', text: 'Файл загружен в галерею' });
-
-    } catch (err) { 
-
-      setMessage({ type: 'error', text: err.message || 'Ошибка при загрузке файла' }); 
-
-    }
-
-  };
-
-
-
   useEffect(() => {
 
     fetchTrainerProfile();
@@ -216,104 +208,70 @@ const TrainerProfileEdit = () => {
 
 
 
+
   const fetchTrainerProfile = async () => {
-
     try {
-
       setLoading(true);
-
-      // Получаем информацию о текущем тренере
-
-      const meResponse = await api.get('/auth/me');
-
-      const trainerInfo = meResponse.data.user?.trainerInfo;
-
+      setError(null);
+      setMessage(null);
       
-
+      // Получаем информацию о текущем тренере
+      const meResponse = await api.get('/auth/me');
+      const trainerInfo = meResponse.data.user?.trainerInfo;
+      
       if (trainerInfo) {
-
         setTrainer(trainerInfo);
-
-        setFormData({
-
-          specialization: trainerInfo.specialization || '',
-
-          bio: trainerInfo.bio || '',
-
-          photoUrl: trainerInfo.photoUrl || '',
-
-          videoUrl: trainerInfo.videoUrl || '',
-
-          experience: trainerInfo.experience || '',
-
-          education: trainerInfo.education || '',
-
-          customPageTitle: trainerInfo.customPageTitle || '',
-
-          customPageContent: trainerInfo.customPageContent || '',
-
-          isPublished: trainerInfo.isPublished || false
-
-        });
-
         
-
-        if (trainerInfo.gallery) {
-
-          try { setGallery(JSON.parse(trainerInfo.gallery)); } catch (e) {}
-
+        // Безопасная обработка медиа файлов
+        let safePhotoUrl = '';
+        let safeVideoUrl = '';
+        
+        try {
+          safePhotoUrl = trainerInfo && trainerInfo.photoUrl && trainerInfo.photoUrl.length < 1000000 ? trainerInfo.photoUrl : '';
+        } catch (e) {
+          console.warn('Error processing photoUrl:', e);
         }
-
-        if (trainerInfo.achievements) {
-
-          try { setAchievements(JSON.parse(trainerInfo.achievements)); } catch (e) {}
-
+        
+        try {
+          safeVideoUrl = trainerInfo && trainerInfo.videoUrl && trainerInfo.videoUrl.length < 1000000 ? trainerInfo.videoUrl : '';
+        } catch (e) {
+          console.warn('Error processing videoUrl:', e);
         }
-
-        if (trainerInfo.certificates) {
-
-          try { 
-
-            const parsed = JSON.parse(trainerInfo.certificates);
-
-            setCertificates(Array.isArray(parsed) ? parsed : []);
-
-          } catch (e) {
-
-            setCertificates([]);
-
-          }
-
-        } else {
-
-          setCertificates([]);
-
-        }
-
-        if (trainerInfo.socialLinks) {
-
-          try { setSocialLinks(JSON.parse(trainerInfo.socialLinks)); } catch (e) {}
-
-        }
-
+        
+        setFormData({
+          specialization: trainerInfo.specialization || '',
+          bio: trainerInfo.bio || '',
+          photoUrl: safePhotoUrl,
+          videoUrl: safeVideoUrl,
+          experience: trainerInfo.experience || '',
+          education: trainerInfo.education || '',
+          customPageTitle: trainerInfo.customPageTitle || '',
+          customPageContent: trainerInfo.customPageContent || '',
+          isPublished: trainerInfo.isPublished || false
+        });
       }
-
     } catch (err) {
-
       console.error('Ошибка при загрузке профиля:', err);
-
       setError('Не удалось загрузить профиль. Попробуйте обновить страницу.');
-
       setMessage({ type: 'error', text: 'Ошибка при загрузке профиля' });
-
+      
+      // Устанавливаем безопасные значения по умолчанию
+      setTrainer({});
+      setFormData({
+        specialization: '',
+        bio: '',
+        photoUrl: '',
+        videoUrl: '',
+        experience: '',
+        education: '',
+        customPageTitle: '',
+        customPageContent: '',
+        isPublished: false
+      });
     } finally {
-
       setLoading(false);
-
     }
-
   };
-
 
 
   const handleChange = (e) => {
@@ -332,38 +290,8 @@ const TrainerProfileEdit = () => {
 
 
 
-  const addGalleryItem = () => {
-
-    setGallery([...gallery, { url: '', type: 'image' }]);
-
-  };
-
-
-
-  const updateGalleryItem = (index, field, value) => {
-
-    const updated = [...gallery];
-
-    updated[index][field] = value;
-
-    setGallery(updated);
-
-  };
-
-
-
-  const removeGalleryItem = (index) => {
-
-    setGallery(gallery.filter((_, i) => i !== index));
-
-  };
-
-
-
-  const addAchievement = () => {
-
+    const addAchievement = () => {
     setAchievements([...achievements, '']);
-
   };
 
 
@@ -445,63 +373,42 @@ const TrainerProfileEdit = () => {
 
 
   const handleSubmit = async (e) => {
-
     e.preventDefault();
-
+    console.log('handleSubmit called', { formData, trainer, gallery, achievements, certificates, socialLinks });
     
-
     try {
-
       setSaving(true);
-
       setMessage(null);
 
-
-
       const data = {
-
         ...formData,
-
         experience: formData.experience ? parseInt(formData.experience) : null,
-
-        gallery: gallery.length > 0 ? gallery : null,
-
-        achievements: achievements.filter(a => a.trim()).length > 0 ? achievements.filter(a => a.trim()) : null,
-
-        certificates: certificates.filter(c => c.trim()).length > 0 ? certificates.filter(c => c.trim()) : null,
-
-        socialLinks: socialLinks.filter(s => s.url.trim()).length > 0 ? socialLinks.filter(s => s.url.trim()) : null
-
+        gallery: gallery && gallery.length > 0 ? gallery : null,
+        achievements: achievements && achievements.filter(a => a.trim()).length > 0 ? achievements.filter(a => a.trim()) : null,
+        certificates: certificates && certificates.filter(c => c.trim()).length > 0 ? certificates.filter(c => c.trim()) : null,
+        socialLinks: socialLinks && socialLinks.filter(s => s.url.trim()).length > 0 ? socialLinks.filter(s => s.url.trim()) : null
       };
 
-
-
-      await api.put(`/trainer/profile/${trainer.id}`, data);
-
+      console.log('Sending data to API:', data);
+      const response = await api.put(`/trainer/profile/${trainer.id}`, data);
+      console.log('API response:', response);
       
-
       setMessage({ type: 'success', text: 'Профиль успешно сохранён!' });
-
       
-
-      // Перезагружаем данные профиля после сохранения
-
-      await fetchTrainerProfile();
-
+      // Перезагружаем данные профиля после сохранения с защитой от ошибок
+      try {
+        await fetchTrainerProfile();
+      } catch (fetchError) {
+        console.error('Error fetching trainer profile after save:', fetchError);
+        // Не показываем ошибку пользователю, просто логируем
+      }
     } catch (err) {
-
       console.error('Ошибка при сохранении:', err);
-
       setMessage({ type: 'error', text: 'Ошибка при сохранении профиля' });
-
     } finally {
-
       setSaving(false);
-
     }
-
   };
-
 
 
   if (loading) {
@@ -547,21 +454,13 @@ const TrainerProfileEdit = () => {
 
 
   return (
-
-    <div className="trainer-profile-edit-page">
-
-      <div className="page-header">
-
-        <h1>👤 Редактирование профиля</h1>
-
-        <p>Заполните информацию о себе для публичной страницы</p>
-
-      </div>
-
-
-
-      <form onSubmit={handleSubmit} className="profile-form">
-
+    <TrainerProfileErrorBoundary>
+      <div className="trainer-profile-edit-page">
+        <div className="page-header">
+          <h1>👤 Редактирование профиля</h1>
+          <p>Заполните информацию о себе для публичной страницы</p>
+        </div>
+        <form onSubmit={handleSubmit} className="profile-form">
         {message && (
 
           <div className={`message ${message.type}`}>
@@ -762,7 +661,7 @@ const TrainerProfileEdit = () => {
 
           <h2>Достижения</h2>
 
-          {achievements.map((achievement, index) => (
+          {achievements && achievements.map((achievement, index) => (
 
             <div key={index} className="dynamic-field">
 
@@ -794,7 +693,7 @@ const TrainerProfileEdit = () => {
 
           <h2>Сертификаты</h2>
 
-          {certificates.map((cert, index) => (
+          {certificates && certificates.map((cert, index) => (
 
             <div key={index} className="dynamic-field">
 
@@ -824,121 +723,9 @@ const TrainerProfileEdit = () => {
 
         <div className="form-section">
 
-          <h2>Галерея (фото/видео)</h2>
-
-          {gallery.map((item, index) => (
-
-            <div key={index} className="gallery-item-edit">
-
-              <select
-
-                value={item.type}
-
-                onChange={(e) => updateGalleryItem(index, 'type', e.target.value)}
-
-              >
-
-                <option value="image">Фото</option>
-
-                <option value="video">Видео</option>
-
-              </select>
-
-              <input
-
-                type="text"
-
-                value={item.url.startsWith('data:') ? '(загружено)' : item.url}
-
-                onChange={(e) => updateGalleryItem(index, 'url', e.target.value)}
-
-                placeholder="URL или выберите файл"
-
-                readOnly={item.url.startsWith('data:')}
-
-                style={{ flex: 1 }}
-
-              />
-
-              <button 
-
-                type="button" 
-
-                className="add-btn"
-
-                onClick={() => {
-
-                  if (!galleryFileRefs.current[index]) {
-
-                    galleryFileRefs.current[index] = React.createRef();
-
-                  }
-
-                  galleryFileRefs.current[index].click();
-
-                }}
-
-                style={{ whiteSpace: 'nowrap', background: 'rgba(139,92,246,0.15)', color: 'var(--primary-light)' }}
-
-              >
-
-                📁 Файл
-
-              </button>
-
-              <input
-
-                ref={(ref) => {
-
-                  if (ref) galleryFileRefs.current[index] = ref;
-
-                }}
-
-                type="file"
-
-                accept={item.type === 'image' ? 'image/*' : 'video/*'}
-
-                style={{ display: 'none' }}
-
-                onChange={(e) => handleGalleryFileChange(e, index)}
-
-              />
-
-              <button type="button" className="remove-btn" onClick={() => removeGalleryItem(index)}>✕</button>
-
-              {item.url && item.url.startsWith('data:') && (
-
-                <div style={{ width: '100%', marginTop: '10px' }}>
-
-                  {item.type === 'image' ? (
-
-                    <img src={item.url} alt="preview" style={{ maxWidth: '100px', height: 'auto', borderRadius: '8px' }} />
-
-                  ) : (
-
-                    <video src={item.url} controls style={{ maxWidth: '200px', height: 'auto', borderRadius: '8px' }} />
-
-                  )}
-
-                </div>
-
-              )}
-
-            </div>
-
-          ))}
-
-          <button type="button" className="add-btn" onClick={addGalleryItem}>+ Добавить в галерею</button>
-
-        </div>
-
-
-
-        <div className="form-section">
-
           <h2>Социальные сети</h2>
 
-          {socialLinks.map((link, index) => (
+          {socialLinks && socialLinks.map((link, index) => (
 
             <div key={index} className="social-link-edit">
 
@@ -1063,16 +850,10 @@ const TrainerProfileEdit = () => {
           </button>
 
         </div>
-
       </form>
-
     </div>
-
+    </TrainerProfileErrorBoundary>
   );
 
 };
-
-
-
 export default TrainerProfileEdit;
-

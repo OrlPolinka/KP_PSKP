@@ -325,7 +325,6 @@ const TrainerProfile = () => {
       {trainer.socialLinks && trainer.socialLinks.length > 0 && (
 
         <div className="trainer-section">
-
           <h2>🔗 Социальные сети</h2>
 
           <div className="social-links">
